@@ -6,6 +6,8 @@ AID is a design system whose material is a noble gas: not glass, not flat colour
 - **Not flat.** Depth comes from density: where the gas is thicker, it scatters more and bends the background more.
 - **Honest about physics.** Every behaviour in [SPEC.md](SPEC.md) is labelled *physical*, *approximation* or *artistic*.
 
+**Live:** https://miladkm77.github.io/aid/ · lab: https://miladkm77.github.io/aid/lab.html
+
 ## Quick start
 
 ```html
@@ -65,6 +67,7 @@ npm install
 npm run build      # dist/aid.js (ESM), dist/aid.min.js (IIFE, global AID), types
 npm run typecheck
 npx http-server .  # or python3 -m http.server, then open /demo/
+npm run pages      # rebuilds the static site in docs/
 ```
 
 ## Status

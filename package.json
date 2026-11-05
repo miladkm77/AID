@@ -1,13 +1,14 @@
 {
   "name": "aid-gas",
   "version": "0.1.0",
-  "description": "AID — Atmospheric Interface Design. A noble-gas material for user interfaces (WebGL2 + Web Components).",
+  "description": "AID \u2014 Atmospheric Interface Design. A noble-gas material for user interfaces (WebGL2 + Web Components).",
   "main": "dist/aid.js",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --format=esm --target=es2020 --outfile=dist/aid.js --sourcemap && esbuild src/index.ts --bundle --format=iife --global-name=AID --target=es2020 --minify --outfile=dist/aid.min.js && tsc",
     "typecheck": "tsc --noEmit -p . --emitDeclarationOnly false",
     "dev": "esbuild src/index.ts --bundle --format=esm --outfile=dist/aid.js --sourcemap --watch --servedir=.",
-    "standalone": "node scripts/standalone.mjs"
+    "standalone": "node scripts/standalone.mjs",
+    "pages": "npm run build && node scripts/pages.mjs"
   },
   "keywords": [
     "design-system",

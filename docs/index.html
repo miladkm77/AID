@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AID · A gas, not glass</title>
+<meta name="description" content="AID is a user-interface material made of noble gas: sealed containers that give way under a finger, settle without waves, and are lit by the content behind them.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{--bg:#EEF0F3;--fg:#13171B;--muted:#56606B;--line:#D5DAE0;--panel:#FAFBFC;--accent:#1F6FB2;
+  --aid-scene-light:246,248,251;--aid-membrane-color:24,34,52;--aid-membrane-alpha:.24;
+  --font:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0B0E11;--fg:#E8ECF0;--muted:#97A3AE;--line:#252C33;--panel:#12171C;--accent:#6AAEEA;
+  --aid-scene-light:120,130,146;--aid-membrane-color:225,232,240;--aid-membrane-alpha:.22;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.6}
+a{color:var(--accent)}
+.hero{height:min(92vh,760px);min-height:560px;--aid-gas:xenon;--aid-temperature:.45;--aid-refraction:150;--aid-light-reach:110;--aid-smoke:.5;--aid-spectral:.1;touch-action:pan-y}
+.hero aid-gas,.hero aid-button,.hero aid-tabs{--aid-pressure:1;font-family:var(--font);color:var(--fg)}
+.hero aid-tab{--aid-pressure:.9}
+.copy{position:absolute;left:clamp(20px,6vw,72px);top:clamp(28px,9vh,96px);max-width:min(680px,88vw);z-index:2;pointer-events:none}
+.eyebrow{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:clamp(40px,8vw,92px);line-height:1;letter-spacing:-.035em;margin:10px 0 18px;font-weight:800}
+.lead{font-size:clamp(16px,2vw,20px);color:var(--muted);max-width:46ch;margin:0}
+.cta{position:absolute;left:clamp(20px,6vw,72px);top:clamp(330px,52vh,430px);display:flex;gap:12px;z-index:2}
+.cta aid-button{height:52px;padding:0 26px;font-weight:600;font-size:15px}
+.gases{position:absolute;left:50%;transform:translateX(-50%);bottom:max(22px,env(safe-area-inset-bottom,0px));width:min(440px,calc(100% - 28px));height:64px;font-weight:600;font-size:13px;color:var(--muted);z-index:2}
+.gases aid-tab[selected]{color:var(--fg)}
+.gname{position:absolute;left:50%;transform:translateX(-50%);bottom:96px;font:600 12px var(--mono);color:var(--muted);z-index:2;text-align:center;pointer-events:none;width:100%}
+main{max-width:1040px;margin:0 auto;padding:56px 20px 72px;display:grid;gap:56px}
+h2{font-size:28px;letter-spacing:-.02em;margin:0 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
+.card h3{margin:0 0 6px;font-size:17px}.card p{margin:0;color:var(--muted);font-size:15px}
+pre{font:12.5px/1.65 var(--mono);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;overflow:auto;margin:0}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600}
+td:not(:first-child),th:not(:first-child){font-family:var(--mono);font-size:13px}
+footer{border-top:1px solid var(--line);padding:24px 20px;text-align:center;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<aid-scene class="hero" id="hero" backdrop="canvas">
+  <div class="copy">
+    <div class="eyebrow">Atmospheric Interface Design</div>
+    <h1>A gas,<br>not glass.</h1>
+    <p class="lead">Every button is a sealed chamber of noble gas. Your finger pushes it aside, it settles without a wave, and the colours behind it light it up.</p>
+  </div>
+  <div class="cta">
+    <aid-button id="goLab">Open the lab</aid-button>
+    <aid-button id="goGit">GitHub</aid-button>
+  </div>
+  <div class="gname" id="gname">xenon · heavy, calm, the default</div>
+  <aid-tabs class="gases" id="gases">
+    <aid-tab>He</aid-tab><aid-tab>Ne</aid-tab><aid-tab>Ar</aid-tab><aid-tab>Kr</aid-tab><aid-tab selected>Xe</aid-tab>
+  </aid-tabs>
+</aid-scene>
+
+<main>
+  <section>
+    <h2>Not glass. Not flat.</h2>
+    <div class="grid">
+      <div class="card"><h3>A volume, not a surface</h3><p>No specular highlight, no lens. Depth comes from density: where the gas is thicker it scatters more and bends the background more.</p></div>
+      <div class="card"><h3>Pressure under the finger</h3><p>The gas thins under a touch and compresses around it. When you let go it settles back, over-damped, with no waves.</p></div>
+      <div class="card"><h3>Content is the light</h3><p>Every colour behind a container is a light source. A photo near a button tints the gas before it passes underneath.</p></div>
+      <div class="card"><h3>Honest about physics</h3><p>Each behaviour in the spec is labelled physical, approximation or artistic. No claim is made that the model does not earn.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The gases</h2>
+    <p style="color:var(--muted);margin:0 0 12px">Switch the gas in the hero. The values are real; the amplitude of refraction is a design gain.</p>
+    <table>
+      <tr><th>Gas</th><th>(n−1)×10⁶</th><th>Molar mass</th><th>Agitation vs Xe</th></tr>
+      <tr><td>Helium</td><td>36</td><td>4.0</td><td>5.7×</td></tr>
+      <tr><td>Neon</td><td>≈67</td><td>20.2</td><td>2.5×</td></tr>
+      <tr><td>Argon</td><td>≈281</td><td>39.9</td><td>1.8×</td></tr>
+      <tr><td>Krypton</td><td>≈427</td><td>83.8</td><td>1.3×</td></tr>
+      <tr><td>Xenon</td><td>≈702</td><td>131.3</td><td>1×</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Use it</h2>
+    <pre>&lt;script type="module" src="aid.js"&gt;&lt;/script&gt;
+
+&lt;aid-scene style="--aid-gas: xenon"&gt;
+  &lt;aid-button&gt;Approve&lt;/aid-button&gt;
+  &lt;aid-tabs&gt;
+    &lt;aid-tab selected&gt;Home&lt;/aid-tab&gt;
+    &lt;aid-tab&gt;Reports&lt;/aid-tab&gt;
+  &lt;/aid-tabs&gt;
+&lt;/aid-scene&gt;</pre>
+    <p style="color:var(--muted)">Parameters are CSS custom properties: <code>--aid-gas</code>, <code>--aid-pressure</code>, <code>--aid-temperature</code>, <code>--aid-refraction</code>, <code>--aid-light-reach</code>, <code>--aid-smoke</code>, <code>--aid-spectral</code>. MIT licensed. Version 0.1: not yet measured on real devices.</p>
+  </section>
+</main>
+<footer>AID · MIT © Milad Karami Motlaq · <a href="https://github.com/miladkm77/aid">github.com/miladkm77/aid</a> · <a href="lab.html">Lab</a></footer>
+
+<script type="module">
+import './aid.js';
+const hero=document.getElementById('hero'),css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const cv=document.createElement('canvas'),cx=cv.getContext('2d');
+/* The backdrop is vivid on purpose: the gas is lit by whatever is behind it. */
+function paint(){
+  const W=hero.clientWidth,H=hero.clientHeight;if(W<10||H<10)return;
+  let dpr=Math.min(devicePixelRatio||1,2);const mx=hero.maxTextureSize||4096;dpr=Math.min(dpr,mx/Math.max(W,H));
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);cx.setTransform(dpr,0,0,dpr,0,0);
+  const dark=matchMedia('(prefers-color-scheme: dark)').matches;
+  cx.fillStyle=dark?'#0B0E11':'#EEF0F3';cx.fillRect(0,0,W,H);
+  const blobs=[[.80,.28,.34,'#2F6FDB'],[.62,.70,.30,'#E2552B'],[.92,.78,.26,'#12A37A'],[.40,.30,.22,'#F0B52C'],[.18,.82,.28,'#8E3FD9']];
+  for(const [x,y,r,c] of blobs){const R=r*Math.max(W,H)*.9,g=cx.createRadialGradient(W*x,H*y,0,W*x,H*y,R);
+    g.addColorStop(0,c+(dark?'EE':'DD'));g.addColorStop(1,c+'00');cx.fillStyle=g;cx.fillRect(0,0,W,H);}
+  hero.setBackdrop(cv,W,H);
+}
+hero.whenReady?.(paint);new ResizeObserver(paint).observe(hero);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',paint);
+document.fonts?.ready.then(paint);
+
+const gases=['helium','neon','argon','krypton','xenon'];
+const note={helium:'helium · nearly invisible, restless',neon:'neon · light, quick',argon:'argon · the middle of the table',krypton:'krypton · dense, slower',xenon:'xenon · heavy, calm, the default'};
+document.getElementById('gases').addEventListener('change',e=>{
+  const g=gases[e.detail.index];hero.style.setProperty('--aid-gas',g);
+  document.getElementById('gname').textContent=note[g];hero.wake?.();
+});
+document.getElementById('goLab').addEventListener('click',()=>location.href='lab.html');
+document.getElementById('goGit').addEventListener('click',()=>location.href='https://github.com/miladkm77/aid');
+</script>
+</body>
+</html>
