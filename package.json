@@ -1,0 +1,44 @@
+{
+  "name": "aid-gas",
+  "version": "0.1.0",
+  "description": "AID — Atmospheric Interface Design. A noble-gas material for user interfaces (WebGL2 + Web Components).",
+  "main": "dist/aid.js",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --format=esm --target=es2020 --outfile=dist/aid.js --sourcemap && esbuild src/index.ts --bundle --format=iife --global-name=AID --target=es2020 --minify --outfile=dist/aid.min.js && tsc",
+    "typecheck": "tsc --noEmit -p . --emitDeclarationOnly false",
+    "dev": "esbuild src/index.ts --bundle --format=esm --outfile=dist/aid.js --sourcemap --watch --servedir=.",
+    "standalone": "node scripts/standalone.mjs"
+  },
+  "keywords": [
+    "design-system",
+    "webgl2",
+    "web-components",
+    "material",
+    "gas",
+    "noble-gas",
+    "xenon",
+    "rtl"
+  ],
+  "author": "Milad Karami Motlaq",
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3"
+  },
+  "type": "module",
+  "module": "dist/aid.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/aid.js"
+    }
+  },
+  "files": [
+    "dist",
+    "SPEC.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": true
+}

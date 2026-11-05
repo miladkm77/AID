@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AID · Demo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#ECEEF0; --fg:#14171A; --muted:#58616B; --line:#D3D8DD; --panel:#FAFBFC;
+  --accent:#1F6FB2; --app-bg:#F3F4F6; --app-ink:#15191E; --app-sub:#5B6570; --app-card:#FFFFFF; --app-line:#E2E6EA;
+  --img-a:#2F6FDB; --img-b:#E2552B; --img-c:#12A37A; --img-d:#F0B52C; --img-e:#8E3FD9;
+  /* AID scene light and wall colour follow the theme */
+  --aid-scene-light:246,248,251; --aid-membrane-color:24,34,52; --aid-membrane-alpha:.22;
+  --font-body:"Inter",system-ui,sans-serif; --font-head:"Inter",system-ui,sans-serif; --font-mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0C0F12; --fg:#E6EAEE; --muted:#93A0AC; --line:#262D34; --panel:#141A1F;
+  --accent:#62A8E8; --app-bg:#0F1317; --app-ink:#E4E9EE; --app-sub:#93A0AC; --app-card:#171D23; --app-line:#252D35;
+  --img-a:#4F86E8; --img-b:#F06A3E; --img-c:#2CC496; --img-d:#F2C24A; --img-e:#A866F0;
+  --aid-scene-light:120,130,146; --aid-membrane-color:225,232,240; --aid-membrane-alpha:.2; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);line-height:1.6;padding:20px max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-family:var(--font-head);font-size:clamp(22px,3.4vw,30px);margin:0}
+.lead{color:var(--muted);margin:0;max-width:72ch}
+.lab{display:grid;grid-template-columns:repeat(2,minmax(0,360px)) minmax(0,1fr);gap:20px;align-items:start}
+.col{display:flex;flex-direction:column;gap:8px;min-width:0}
+.cap{font-family:var(--font-head);font-size:13px;font-weight:600;color:var(--muted)}
+
+/* ---- the material's own tokens: set once on the scene, overridable per element ---- */
+aid-scene{--aid-gas:xenon;--aid-temperature:.45;--aid-refraction:140;--aid-light-reach:96;--aid-smoke:.5;--aid-spectral:.1;--aid-quality:auto}
+aid-gas,aid-button,aid-tabs{--aid-pressure:1}
+aid-tab{--aid-pressure:.9}
+.bar{--aid-pressure:1.2}
+
+.phone{width:100%;max-width:360px;height:min(720px,80vh);min-height:520px;border-radius:32px;border:1px solid var(--line);background:var(--app-bg);touch-action:none;user-select:none;-webkit-user-select:none}
+.phone .bar{position:absolute;top:10px;left:10px;right:10px;height:54px;border-radius:24px;display:flex;justify-content:space-between;padding:0 18px;font-family:var(--font-head);color:var(--app-ink)}
+.phone .bar b{font-weight:800;font-size:17px}.phone .bar span{font-family:var(--font-mono);font-size:11px;color:var(--app-sub)}
+.phone aid-tabs{position:absolute;left:12px;right:12px;bottom:14px;height:64px;font-family:var(--font-head);font-size:12px;font-weight:600;color:var(--app-sub)}
+.phone aid-tab[selected]{color:var(--app-ink)}
+.phone aid-tab i{font-style:normal;font-family:var(--font-mono);font-size:15px;line-height:1}
+.phone .fab{position:absolute;left:18px;bottom:94px;width:62px;height:62px;padding:0;border-radius:31px;font-size:26px;color:var(--app-ink)}
+.phone aid-button{font-family:var(--font-head);font-weight:600;font-size:14.5px;color:var(--app-ink)}
+.inl{position:absolute;left:0;top:0;height:46px;z-index:1}
+
+/* DOM backdrop: real HTML feed scrolls under the gas */
+.feed{position:absolute;inset:0;overflow-y:auto;padding:76px 14px 96px;scrollbar-width:none;touch-action:pan-y}
+.feed::-webkit-scrollbar{display:none}
+.card{background:var(--app-card);border:1px solid var(--app-line);border-radius:18px;padding:12px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}
+.card .img{height:120px;border-radius:12px}
+.card h3{font-family:var(--font-head);font-size:16px;margin:0;color:var(--app-ink)}
+.card p{margin:0;font-size:14px;color:var(--app-sub);line-height:1.7}
+.card .row{display:flex;gap:10px;justify-content:flex-start}
+
+.panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.param{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 10px;align-items:center}
+.param label{font-family:var(--font-head);font-size:13.5px;font-weight:600}
+.param output{font-family:var(--font-mono);font-size:12px;color:var(--muted);direction:ltr}
+.param input{grid-column:1/-1;width:100%;accent-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font-family:var(--font-head);font-size:13px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:.25em .9em;cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips button:focus-visible,.param input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+pre{font-family:var(--font-mono);font-size:11.5px;line-height:1.65;direction:ltr;text-align:left;margin:0;white-space:pre;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;overflow-x:auto}
+@media (max-width:1100px){.lab{grid-template-columns:repeat(2,minmax(0,1fr))}.panel{grid-column:1/-1}}
+@media (max-width:760px){.lab{grid-template-columns:1fr}.phone{margin-inline:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <h1>AID · a gas material for interfaces</h1>
+    <p class="lead">Both phones are built only from <code>&lt;aid-scene&gt;</code>, <code>&lt;aid-button&gt;</code> and <code>&lt;aid-tabs&gt;</code>. On the left the content behind the gas is drawn on a canvas, so the full model runs. On the right it is real HTML, which is the mode a panel or a website uses.</p>
+  </header>
+
+  <div class="lab">
+    <div class="col">
+      <span class="cap">backdrop="canvas" · full model</span>
+      <aid-scene class="phone" id="sceneA" backdrop="canvas">
+        <aid-gas class="bar"><b>Files</b><span>14:24</span></aid-gas>
+        <aid-button class="inl" id="inA">Approve</aid-button>
+        <aid-button class="inl" id="inB" style="--aid-pressure:.55">Draft</aid-button>
+        <aid-button class="inl" id="inC" disabled>Send</aid-button>
+        <aid-button class="fab" aria-label="New file">+</aid-button>
+        <aid-tabs class="bar-tabs">
+          <aid-tab selected><i>◐</i>Home</aid-tab><aid-tab><i>≡</i>Files</aid-tab><aid-tab><i>◇</i>Reports</aid-tab><aid-tab><i>○</i>Me</aid-tab>
+        </aid-tabs>
+      </aid-scene>
+    </div>
+
+    <div class="col">
+      <span class="cap">backdrop="dom" · real HTML content</span>
+      <aid-scene class="phone" id="sceneB">
+        <div class="feed" id="feedB"></div>
+        <aid-gas class="bar"><b>Files</b><span>14:24</span></aid-gas>
+        <aid-button class="fab" aria-label="New file">+</aid-button>
+        <aid-tabs>
+          <aid-tab selected><i>◐</i>Home</aid-tab><aid-tab><i>≡</i>Files</aid-tab><aid-tab><i>◇</i>Reports</aid-tab><aid-tab><i>○</i>Me</aid-tab>
+        </aid-tabs>
+      </aid-scene>
+    </div>
+
+    <div class="panel">
+      <div class="col"><span class="cap">--aid-gas</span>
+        <div class="chips" id="gasRow">
+          <button type="button" data-g="helium" aria-pressed="false">He</button><button type="button" data-g="neon" aria-pressed="false">Ne</button>
+          <button type="button" data-g="argon" aria-pressed="false">Ar</button><button type="button" data-g="krypton" aria-pressed="false">Kr</button>
+          <button type="button" data-g="xenon" aria-pressed="true">Xe</button>
+        </div></div>
+      <div class="param"><label for="tP">--aid-pressure (bars)</label><output id="oP"></output><input type="range" id="tP" min="0.1" max="2" step="0.01" value="1.2"></div>
+      <div class="param"><label for="tT">--aid-temperature</label><output id="oT"></output><input type="range" id="tT" min="0" max="1" step="0.01" value="0.45"></div>
+      <div class="param"><label for="tR">--aid-refraction</label><output id="oR"></output><input type="range" id="tR" min="0" max="400" step="5" value="140"></div>
+      <div class="param"><label for="tL">--aid-light-reach</label><output id="oL"></output><input type="range" id="tL" min="0" max="200" step="2" value="96"></div>
+      <div class="param"><label for="tS">--aid-smoke</label><output id="oS"></output><input type="range" id="tS" min="0" max="1" step="0.01" value="0.5"></div>
+      <div class="param"><label for="tX">--aid-spectral</label><output id="oX"></output><input type="range" id="tX" min="0" max="1" step="0.01" value="0.1"></div>
+      <div class="col"><span class="cap">--aid-quality</span>
+        <div class="chips" id="qRow"><button type="button" data-q="auto" aria-pressed="true">auto</button><button type="button" data-q="static" aria-pressed="false">static</button><button type="button" data-q="efficient" aria-pressed="false">efficient</button><button type="button" data-q="high" aria-pressed="false">high</button></div></div>
+      <div class="col"><span class="cap">view</span>
+        <div class="chips" id="vRow"><button type="button" data-v="final" aria-pressed="true">final</button><button type="button" data-v="density" aria-pressed="false">density</button><button type="button" data-v="light" aria-pressed="false">light</button></div></div>
+      <pre id="css"></pre>
+      <pre id="stats">…</pre>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import '../dist/aid.js';
+const A = document.getElementById('sceneA'), B = document.getElementById('sceneB');
+const tok = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const lines = ['Outpatient services under the family','physician contract were calculated and','sent for approval. If the reviewer rejects','them, the reason goes to the clinic.'];
+const hosp = ['Central','Northern','Riverside','Harbor'];
+
+/* ---------- scene A: content drawn to a tall canvas ---------- */
+const fc = document.createElement('canvas'), fx = fc.getContext('2d');
+let feedH = 3000, W = 0, H = 0, scroll = 0, vel = 0, INL = {};
+function rr(x,y,w,h,r){fx.beginPath();fx.moveTo(x+r,y);fx.arcTo(x+w,y,x+w,y+h,r);fx.arcTo(x+w,y+h,x,y+h,r);fx.arcTo(x,y+h,x,y,r);fx.arcTo(x,y,x+w,y,r);fx.closePath();}
+function drawFeed(){
+  W = A.clientWidth; H = A.clientHeight;
+  let dpr = Math.min(devicePixelRatio || 1, 2); if (feedH * dpr > A.maxTextureSize) dpr = A.maxTextureSize / feedH;
+  fc.width = Math.round(W * dpr); fc.height = Math.round(feedH * dpr); fx.setTransform(dpr,0,0,dpr,0,0);
+  const ink=tok('--app-ink'),sub=tok('--app-sub'),card=tok('--app-card'),line=tok('--app-line'),I=['--img-a','--img-b','--img-c','--img-d','--img-e'].map(tok);
+  fx.fillStyle=tok('--app-bg');fx.fillRect(0,0,W,feedH);fx.direction='ltr';fx.textAlign='left';
+  let y=84;const pad=14,cw=W-pad*2;
+  fx.fillStyle=ink;fx.font='800 23px Inter,system-ui';fx.fillText('Today, 5 November',pad+4,y+26);
+  fx.fillStyle=sub;fx.font='400 14px Inter,system-ui';fx.fillText('12 cases waiting for review',pad+4,y+50);y+=74;
+  for(let i=0;i<10;i++){
+    const img=i%3!==1;let h=img?318:208;if(i===1||i===4)h+=58;
+    fx.fillStyle=card;rr(pad,y,cw,h,18);fx.fill();fx.strokeStyle=line;fx.stroke();
+    let cy=y+14;
+    if(img){const g=fx.createLinearGradient(pad,cy,pad+cw,cy+130);g.addColorStop(0,I[i%5]);g.addColorStop(1,I[(i+2)%5]);fx.fillStyle=g;rr(pad+12,cy,cw-24,130,12);fx.fill();
+      const sx=pad+70+(i*37)%120,s=fx.createRadialGradient(sx,cy+62,4,sx,cy+62,44);s.addColorStop(0,'rgba(255,255,240,1)');s.addColorStop(1,'rgba(255,255,240,0)');fx.fillStyle=s;fx.fillRect(pad+12,cy,cw-24,130);cy+=146;}
+    fx.fillStyle=ink;fx.font='800 16px Inter,system-ui';fx.fillText('Case '+(1248+i)+' · '+hosp[i%4]+' Hospital',pad+12,cy+16);
+    fx.fillStyle=sub;fx.font='400 14px Inter,system-ui';const nl=img?3:4;for(let l=0;l<nl;l++)fx.fillText(lines[l],pad+12,cy+42+l*23);cy+=42+nl*23;
+    if(i===1)INL.inA=INL.inB=cy+14; if(i===4)INL.inC=cy+14;
+    y+=h+14;
+  }
+  feedH=Math.max(feedH,y+100);
+  A.setBackdrop(fc, W, feedH);
+}
+function layout(){
+  const a=document.getElementById('inA'),b=document.getElementById('inB'),c=document.getElementById('inC'),L=14+12;
+  const put=(n,x,y)=>{n.style.transform=`translate(${x}px,${y}px)`;n.style.visibility=(y>-60&&y<H+10)?'visible':'hidden';};
+  put(a,L,INL.inA-scroll);put(b,L+a.offsetWidth+10,INL.inB-scroll);put(c,L,INL.inC-scroll);
+  A.backdropScroll=scroll;
+}
+const maxS=()=>Math.max(0,feedH-H);
+let drag=null,raf=0;
+function glide(){raf=0;if(drag||Math.abs(vel)<4)return;scroll=Math.min(maxS(),Math.max(0,scroll+vel/60));vel*=.93;layout();raf=requestAnimationFrame(glide);}
+A.addEventListener('pointerdown',e=>{if(e.target.closest('aid-button,aid-tab'))return;drag={y:e.clientY,t:performance.now()};vel=0;A.setPointerCapture(e.pointerId);});
+A.addEventListener('pointermove',e=>{if(!drag)return;const dy=drag.y-e.clientY,t=performance.now();scroll=Math.min(maxS(),Math.max(0,scroll+dy));vel=.7*vel+.3*dy/Math.max((t-drag.t)/1000,1/240);drag={y:e.clientY,t};layout();});
+A.addEventListener('pointerup',()=>{if(!drag)return;if(performance.now()-drag.t>80)vel=0;drag=null;if(!raf)raf=requestAnimationFrame(glide);});
+A.addEventListener('wheel',e=>{e.preventDefault();scroll=Math.min(maxS(),Math.max(0,scroll+e.deltaY));layout();},{passive:false});
+new ResizeObserver(()=>{drawFeed();layout();}).observe(A);
+document.fonts?.ready.then(()=>{drawFeed();layout();});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{drawFeed();layout();});
+
+/* ---------- scene B: regular HTML ---------- */
+const feedB=document.getElementById('feedB');
+const grads=[['--img-a','--img-c'],['--img-b','--img-d'],['--img-c','--img-e'],['--img-d','--img-a'],['--img-e','--img-b']];
+feedB.innerHTML='<h2 style="font-family:var(--font-head);font-size:23px;margin:4px 4px 0;color:var(--app-ink)">Today, 5 November</h2><p style="margin:0 4px 12px;color:var(--app-sub)">12 cases waiting for review</p>'+
+  Array.from({length:10},(_,i)=>`<article class="card">${i%3!==1?`<div class="img" style="background:linear-gradient(110deg,var(${grads[i%5][0]}),var(${grads[i%5][1]}))"></div>`:''}
+  <h3>Case ${1248+i} · ${hosp[i%4]} Hospital</h3><p>${lines.slice(0,3).join(' ')}</p>
+  ${i===1?'<div class="row"><aid-button>Approve</aid-button><aid-button style="--aid-pressure:.55">Draft</aid-button></div>':''}
+  ${i===4?'<div class="row"><aid-button disabled>Send</aid-button></div>':''}</article>`).join('');
+feedB.addEventListener('scroll',()=>B.wake(),{passive:true});
+
+/* ---------- panel: every control writes a CSS custom property ---------- */
+const scenes=[A,B],css=document.getElementById('css');
+function show(){const cs=getComputedStyle(A);css.textContent=['--aid-gas','--aid-temperature','--aid-refraction','--aid-light-reach','--aid-smoke','--aid-spectral','--aid-quality'].map(n=>`${n}: ${cs.getPropertyValue(n).trim()};`).join('\n')+`\n.bar { --aid-pressure: ${getComputedStyle(document.querySelector('.bar')).getPropertyValue('--aid-pressure').trim()}; }`;}
+function setVar(n,v){scenes.forEach(s=>{s.style.setProperty(n,v);s.wake();});show();}
+const bindR=(id,name,fmt,target)=>{const i=document.getElementById('t'+id),o=document.getElementById('o'+id);const f=()=>{o.textContent=fmt(+i.value);
+  if(target)document.querySelectorAll(target).forEach(e=>e.style.setProperty(name,i.value));else setVar(name,i.value);scenes.forEach(s=>s.wake());show();};i.addEventListener('input',f);f();};
+bindR('P','--aid-pressure',v=>v.toFixed(2),'.bar,aid-tabs');
+bindR('T','--aid-temperature',v=>Math.round(250+150*v)+' K');
+bindR('R','--aid-refraction',v=>'×'+v);
+bindR('L','--aid-light-reach',v=>v+'px');
+bindR('S','--aid-smoke',v=>v.toFixed(2));
+bindR('X','--aid-spectral',v=>v.toFixed(2));
+const chips=(rowId,attr,apply)=>{const row=document.getElementById(rowId);row.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{row.querySelectorAll('button').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));apply(b.dataset[attr]);}));};
+chips('gasRow','g',g=>setVar('--aid-gas',g));
+chips('qRow','q',q=>setVar('--aid-quality',q));
+chips('vRow','v',v=>scenes.forEach(s=>s.setAttribute('view',v)));
+const st=document.getElementById('stats'),last={};
+const fmt=s=>`${s.tier.padEnd(9)} grid ${s.grid.padEnd(8)} sim ${String(s.simHz||'off').padEnd(3)} fps ${s.fps?s.fps.toFixed(0):'–'}  ${s.state}${s.error?'  ERR '+s.error:''}`;
+const upd=()=>{st.textContent='canvas  '+(last.A?fmt(last.A):'…')+'\ndom     '+(last.B?fmt(last.B):'…');};
+A.addEventListener('aid-stats',e=>{last.A=e.detail;upd();});B.addEventListener('aid-stats',e=>{last.B=e.detail;upd();});
+A.querySelector('aid-tabs').addEventListener('change',e=>console.log('tab',e.detail.index));
+show();
+</script>
+</body>
+</html>

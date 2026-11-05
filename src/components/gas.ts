@@ -1,0 +1,82 @@
+import type { GasContainer } from '../engine/engine';
+import type { AidScene } from './scene';
+
+const gasCss = `
+:host{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:host([hidden]){display:none}
+`;
+
+/**
+ * <aid-gas> — a sealed container of gas. Its shape is the element's box and border-radius.
+ * Density comes from --aid-pressure; interaction state scales it:
+ *   disabled → evacuated (0), pressed → compressed (×1.25), otherwise ×1.
+ */
+export class AidGas extends HTMLElement implements GasContainer {
+  protected scene: AidScene | null = null;
+  protected pressed = false;
+
+  static get observedAttributes(): string[] { return ['disabled']; }
+
+  constructor() {
+    super();
+    const root = this.attachShadow({ mode: 'open' });
+    const s = document.createElement('style');
+    s.textContent = gasCss + this.extraCss();
+    root.append(s, document.createElement('slot'));
+  }
+
+  protected extraCss(): string { return ''; }
+
+  get el(): HTMLElement { return this; }
+
+  connectedCallback(): void {
+    this.scene = this.closest('aid-scene') as AidScene | null;
+    if (!this.scene) return;
+    const attach = () => this.scene!.whenReady(() => this.scene!.engine!.add(this));
+    if (customElements.get('aid-scene')) attach();
+    else customElements.whenDefined('aid-scene').then(attach);
+    this.addEventListener('pointerdown', this.onDown);
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => this.addEventListener(t, this.onUp));
+  }
+
+  disconnectedCallback(): void {
+    this.scene?.engine?.remove(this);
+    this.removeEventListener('pointerdown', this.onDown);
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => this.removeEventListener(t, this.onUp));
+  }
+
+  attributeChangedCallback(): void { this.scene?.wake(); }
+
+  get disabled(): boolean { return this.hasAttribute('disabled'); }
+  set disabled(v: boolean) { this.toggleAttribute('disabled', v); }
+
+  protected interactive(): boolean { return false; }
+
+  private onDown = (): void => {
+    if (!this.interactive() || this.disabled) return;
+    this.pressed = true;
+    this.setAttribute('data-pressed', '');
+    this.scene?.wake();
+  };
+
+  private onUp = (): void => {
+    if (!this.pressed) return;
+    this.pressed = false;
+    this.removeAttribute('data-pressed');
+    this.scene?.wake();
+  };
+
+  /** briefly compress, for keyboard activation */
+  protected pulse(): void {
+    this.pressed = true;
+    this.scene?.wake();
+    setTimeout(() => { this.pressed = false; this.scene?.wake(); }, 180);
+  }
+
+  stateFactor(): number {
+    if (this.disabled) return 0;
+    return this.pressed ? 1.25 : 1;
+  }
+
+  dashed(): boolean { return this.disabled; }
+}
