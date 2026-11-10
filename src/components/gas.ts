@@ -8,6 +8,10 @@ const gasCss = `
 -webkit-backdrop-filter:var(--_aid-bf,none);backdrop-filter:var(--_aid-bf,none);
 --_aid-fade:calc(var(--_aid-fade-unit,9999px) / max(var(--aid-weight,.6),.02));
 -webkit-mask-image:linear-gradient(var(--_aid-angle,0deg),#000,rgba(0,0,0,.12) var(--_aid-fade));mask-image:linear-gradient(var(--_aid-angle,0deg),#000,rgba(0,0,0,.12) var(--_aid-fade))}
+/* depth: where this container floats above a lower one, its gas fogs the lower container (set by the engine) */
+:host::after{content:"";position:absolute;inset:1.5px;border-radius:inherit;z-index:-1;pointer-events:none;display:var(--_aid-veil-d,none);
+-webkit-backdrop-filter:blur(calc(var(--aid-pressure,1) * 4px));backdrop-filter:blur(calc(var(--aid-pressure,1) * 4px));
+background:rgba(var(--aid-scene-light,246,248,251),.14);-webkit-clip-path:var(--_aid-veil-clip,none);clip-path:var(--_aid-veil-clip,none)}
 `;
 
 /**

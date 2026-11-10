@@ -29,6 +29,8 @@ A translucent panel that blurs and bends what is behind it reads as glass, whate
 
 Every component is a sealed container. The gas never leaves it, so reading areas outside containers are never distorted *(Artistic: real gas is unbounded)*. A thin membrane draws the container wall. An evacuated container (disabled) shows a dashed wall.
 
+**Depth between containers.** A container that floats above another (higher `z-index`, or later in the document at the same `z-index`) fogs the one below: inside the upper container, the lower container's wall, gas and label are blurred and veiled, clipped to the lower container's own shape. Without this the two would read as one flat layer. *(Approximation: the gas of both is still one 2D field; the depth is a veil, not a second simulated layer.)*
+
 ### 3.2 Gas state
 
 The gas inside all containers of one scene is one 2D field of density ρ and velocity **v**, solved on the GPU at low resolution.
@@ -94,7 +96,7 @@ Scene level, set on `<aid-scene>`:
 | `--aid-spectral` | 0 – 1 | 0.1 | λ⁻⁴ colour of scattering |
 | `--aid-quality` | auto · static · efficient · high | auto | device tier |
 | `--aid-scene-light` | r,g,b | 246,248,251 | theme light |
-| `--aid-membrane-color` / `-alpha` | r,g,b / 0–1 | 24,34,52 / .22 | wall |
+| `--aid-membrane-color` / `-alpha` | r,g,b / 0–1 | 24,34,52 / .14 | wall: a soft line about 2 px wide |
 
 Container level, set on any `<aid-gas>`, `<aid-button>`, `<aid-tabs>`, `<aid-tab>`:
 

@@ -201,24 +201,21 @@ vec2 fuv(vec2 s){float fy=scr+(1.-s.y)*vf;return vec2(clamp(s.x,0.,1.),1.-clamp(
 vec3 feed(vec2 s){return texture(uFeed,fuv(s)).rgb;}
 float fbm(vec2 p){return texture(uNz,p).x*.55+texture(uNz,p*1.97+.37).x*.3+texture(uNz,p*3.9+.71).x*.15;}
 float luma(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
-/* smooth gas state: x = density, y = density the container is regulated to, z = inside a container */
-vec3 gasAt(vec2 uv){
- if(hasSim>0.){vec4 G=texture(uGt,uv);return vec3(texture(uS,uv).x,G.y,G.x);}
- float tg=0.,ins=0.;
- for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;if(elD(i,uv)>0.)continue;ins=1.;tg+=uI[i].x*elS(i,uv);}
- if(ins<.5)return vec3(0.);
- vec2 d=(uv-uPtr.xy)*uPx;
- return vec3(tg*(1.-min(uPtr.z/600.,.7)*exp(-dot(d,d)/(uPtr.w*uPtr.w))),tg,1.);}
+/* The simulation supplies how far the gas is from its settled state, as the ratio \u03C1/\u03C1_eq (1 at rest). The settled
+   profile itself is evaluated per pixel from the container shapes, so its edges stay sharp at any grid size. */
+float ratio(vec2 uv){
+ if(hasSim>0.){vec4 G=texture(uGt,uv);return G.x>.02?clamp(texture(uS,uv).x/max(G.y,.03),0.,4.):1.;}
+ vec2 d=(uv-uPtr.xy)*uPx;return 1.-min(uPtr.z/600.,.7)*exp(-dot(d,d)/(uPtr.w*uPtr.w));}
 void main(){
- bool near=false;float memv=0.,th=0.,ex=0.,wall=1e4;
+ bool near=false;float memv=0.,th=0.,ex=0.,wall=1e4,tg=0.;
  for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;float d=elD(i,vUv);if(d<1.)near=true;float a=abs(uI[i].w);
-  wall=min(wall,abs(d));if(d<=0.){th=max(th,elT(i,d));ex=max(ex,uE[i].x);}
-  if(a>0.){float ring=1.-smoothstep(0.,1.1,abs(d+.6));if(uI[i].w<0.)ring*=step(.5,fract((vUv.x*uPx.x+vUv.y*uPx.y)/7.));memv=max(memv,ring*a);}}
+  wall=min(wall,abs(d));if(d<1.)tg+=(1.-smoothstep(-1.,1.,d))*uI[i].x*elS(i,vUv);if(d<=0.){th=max(th,elT(i,d));ex=max(ex,uE[i].x);}
+  if(a>0.){float ring=1.-smoothstep(0.,1.9,abs(d+.9));   /* a soft wall, not a hairline */
+   if(uI[i].w<0.)ring*=step(.5,fract((vUv.x*uPx.x+vUv.y*uPx.y)/7.));memv=max(memv,ring*a);}}
  if(!near||mode==3){if(hasFeed>0.)o=vec4((mode==0||mode==3)?feed(vUv):vec3(.04),1.);else o=vec4(0.);return;}
- vec3 g0=gasAt(vUv),gl=gasAt(vL),gr=gasAt(vR),gt=gasAt(vT),gb=gasAt(vB);
- /* only the disturbance (density minus the settled profile) refracts: it is zero at rest and outside the gas,
-    so a wall never acts as a lens */
- float dl=gl.x-gl.y,dr=gr.x-gr.y,dT=gt.x-gt.y,dB=gb.x-gb.y,d0=g0.x-g0.y;
+ float s0=ratio(vUv),rho=tg*s0;
+ /* only the disturbance (density minus the settled profile) refracts: it is zero at rest, so a wall never acts as a lens */
+ float dl=tg*(ratio(vL)-1.),dr=tg*(ratio(vR)-1.),dT=tg*(ratio(vT)-1.),dB=tg*(ratio(vB)-1.),d0=tg*(s0-1.);
  float inner=smoothstep(1.,3.,wall/(uPx.x*(vR.x-vUv.x)));     /* the cells at a wall are held, not simulated */
  vec2 grad=vec2(dr-dl,dT-dB)*.5*inner;
  float lap=(dl+dr+dT+dB-4.*d0)*inner;
@@ -227,7 +224,7 @@ void main(){
  /* wisps: where the gas is thin only the peaks of the texture show; where it has pooled it is continuous */
  /* the edge of the layer billows on the two coarse octaves only; fine noise there reads as a row of beads */
  vec2 bp=vUv*uPx/640.+vec2(.006,-.011)*flowT-fl;float bil=texture(uNz,bp).x*.68+texture(uNz,bp*1.97+.37).x*.32;
- float D=th*g0.x*mix(1.,smoothstep(.28,.74,bil+.4*(g0.x-1.))*1.6,smoke);
+ float D=th*rho*mix(1.,smoothstep(.28,.74,bil+.4*(rho-1.))*1.6,smoke);
  vec2 off=grad*dn*1e-6*amp*2.4;
  vec2 q=vUv*uPx/230.+vec2(.05,.11)*flowT;float n0=texture(uNz,q).x;
  off+=vec2(n0-texture(uNz,q+vec2(.02,0.)).x,n0-texture(uNz,q+vec2(0.,.02)).x)*D*agit*dn*1e-6*amp*.45;   /* thermal shimmer */
@@ -483,7 +480,7 @@ var GasEngine = class {
   /* ---------------- containers ---------------- */
   add(c) {
     if (this.slots.has(c)) return;
-    const s = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, ev: 0, wv: CONTAINER_DEFAULTS.weight, lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
+    const s = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, ev: 0, wv: CONTAINER_DEFAULTS.weight, z: 0, rect: null, rad: 0, veil: "", lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
     this.slots.set(c, s);
     this.order.push(s);
     this.refreshParams(true);
@@ -494,6 +491,10 @@ var GasEngine = class {
     if (!s) return;
     this.slots.delete(c);
     this.order.splice(this.order.indexOf(s), 1);
+    if (s.veil) {
+      c.el.style.removeProperty("--_aid-veil-clip");
+      c.el.style.removeProperty("--_aid-veil-d");
+    }
     this.wake();
   }
   /* ---------------- backdrop ---------------- */
@@ -556,7 +557,11 @@ var GasEngine = class {
     if (!force && now - this.lastParams < 250) return;
     this.lastParams = now;
     this.scene = readSceneParams(this.host);
-    for (const s of this.order) s.params = readContainerParams(s.c.el);
+    for (const s of this.order) {
+      const cs = getComputedStyle(s.c.el);
+      s.params = readContainerParams(s.c.el);
+      s.z = parseInt(cs.zIndex, 10) || 0;
+    }
     const t = chooseTier(this.scene.quality);
     if (t !== this.tier) {
       this.tier = t;
@@ -587,6 +592,7 @@ var GasEngine = class {
     }
     this.n = 0;
     for (const s of this.order) {
+      s.rect = null;
       if (this.n >= MAX_CONTAINERS) break;
       const target = s.c.stateFactor() * s.params.pressure;
       const k = target > s.pv ? s.c.stateFactor() > 1 ? 14 : 4 : 2.5;
@@ -609,6 +615,8 @@ var GasEngine = class {
       this.uR[j + 2] = x1;
       this.uR[j + 3] = y1;
       const rad = parseFloat(getComputedStyle(s.c.el).borderTopLeftRadius) || 0;
+      s.rect = r;
+      s.rad = rad;
       this.uI[j] = s.pv * df;
       this.uI[j + 1] = s.params.profile;
       this.uI[j + 2] = rad;
@@ -625,7 +633,50 @@ var GasEngine = class {
       s.lastY = y0;
       this.n++;
     }
+    this.depth();
     return moving;
+  }
+  /**
+   * Depth between containers. The gas of all containers is drawn in one layer under the labels, so on its own a
+   * container floating above another would not hide it. Each container that sits above a lower one gets a veil
+   * (a CSS layer inside it, clipped to the overlap) that fogs the lower container's wall, gas and label.
+   */
+  depth() {
+    for (const up of this.order) {
+      let veil = "";
+      const a = up.rect;
+      if (a && !up.c.dashed() && up.pv > 0.05) {
+        let x0 = 0, y0 = 0, x1 = 0, y1 = 0, rad = 0, best = 0;
+        for (const lo of this.order) {
+          const b = lo.rect;
+          if (!b || lo === up || lo.z > up.z || up.c.el.contains(lo.c.el) || lo.c.el.contains(up.c.el)) continue;
+          if (lo.z === up.z && !(lo.c.el.compareDocumentPosition(up.c.el) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+          const w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (w < 1 || h < 1 || w * h <= best) continue;
+          best = w * h;
+          x0 = b.left;
+          y0 = b.top;
+          x1 = b.right;
+          y1 = b.bottom;
+          rad = lo.rad;
+        }
+        if (x1 > x0) {
+          const o = 1.5, f = (v) => Math.round(v * 2) / 2;
+          veil = `inset(${f(y0 - a.top - o)}px ${f(a.right - x1 - o)}px ${f(a.bottom - y1 - o)}px ${f(x0 - a.left - o)}px round ${Math.round(rad)}px)`;
+        }
+      }
+      if (veil !== up.veil) {
+        up.veil = veil;
+        const st = up.c.el.style;
+        if (veil) {
+          st.setProperty("--_aid-veil-clip", veil);
+          st.setProperty("--_aid-veil-d", "block");
+        } else {
+          st.removeProperty("--_aid-veil-clip");
+          st.removeProperty("--_aid-veil-d");
+        }
+      }
+    }
   }
   setContainers(p) {
     const gl = this.gl, u = p.u;
@@ -709,7 +760,7 @@ var GasEngine = class {
     const sp = sc.spectral;
     gl.uniform3f(u.tw, 1 + (RAYLEIGH[0] - 1) * sp, 1 + (RAYLEIGH[1] - 1) * sp, 1 + (RAYLEIGH[2] - 1) * sp);
     const mem = rgb(cs.getPropertyValue("--aid-membrane-color"), [24, 34, 52]);
-    const ma = parseFloat(cs.getPropertyValue("--aid-membrane-alpha")) || 0.22;
+    const ma = parseFloat(cs.getPropertyValue("--aid-membrane-alpha")) || 0.14;
     gl.uniform4f(u.mem, mem[0], mem[1], mem[2], ma);
     gl.uniform4f(u.uPtr, this.ptr.x, this.ptr.y, this.ptr.str, this.ptr.down ? 20 : 26);
     if (!this.hasFeed) {
@@ -981,6 +1032,10 @@ var gasCss = `
 -webkit-backdrop-filter:var(--_aid-bf,none);backdrop-filter:var(--_aid-bf,none);
 --_aid-fade:calc(var(--_aid-fade-unit,9999px) / max(var(--aid-weight,.6),.02));
 -webkit-mask-image:linear-gradient(var(--_aid-angle,0deg),#000,rgba(0,0,0,.12) var(--_aid-fade));mask-image:linear-gradient(var(--_aid-angle,0deg),#000,rgba(0,0,0,.12) var(--_aid-fade))}
+/* depth: where this container floats above a lower one, its gas fogs the lower container (set by the engine) */
+:host::after{content:"";position:absolute;inset:1.5px;border-radius:inherit;z-index:-1;pointer-events:none;display:var(--_aid-veil-d,none);
+-webkit-backdrop-filter:blur(calc(var(--aid-pressure,1) * 4px));backdrop-filter:blur(calc(var(--aid-pressure,1) * 4px));
+background:rgba(var(--aid-scene-light,246,248,251),.14);-webkit-clip-path:var(--_aid-veil-clip,none);clip-path:var(--_aid-veil-clip,none)}
 `;
 var AidGas = class extends HTMLElement {
   constructor() {

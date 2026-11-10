@@ -35,6 +35,11 @@ interface Slot {
   pv: number;
   ev: number;
   wv: number;
+  /** stacking order inside the scene (the element's z-index) */
+  z: number;
+  rect: DOMRect | null;
+  rad: number;
+  veil: string;
   lastX: number;
   lastY: number;
   accX: number;
@@ -115,7 +120,7 @@ export class GasEngine {
   /* ---------------- containers ---------------- */
   add(c: GasContainer): void {
     if (this.slots.has(c)) return;
-    const s: Slot = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, ev: 0, wv: CONTAINER_DEFAULTS.weight, lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
+    const s: Slot = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, ev: 0, wv: CONTAINER_DEFAULTS.weight, z: 0, rect: null, rad: 0, veil: '', lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
     this.slots.set(c, s);
     this.order.push(s);
     this.refreshParams(true);
@@ -127,6 +132,7 @@ export class GasEngine {
     if (!s) return;
     this.slots.delete(c);
     this.order.splice(this.order.indexOf(s), 1);
+    if (s.veil) { c.el.style.removeProperty('--_aid-veil-clip'); c.el.style.removeProperty('--_aid-veil-d'); }
     this.wake();
   }
 
@@ -185,7 +191,11 @@ export class GasEngine {
     if (!force && now - this.lastParams < 250) return;
     this.lastParams = now;
     this.scene = readSceneParams(this.host);
-    for (const s of this.order) s.params = readContainerParams(s.c.el);
+    for (const s of this.order) {
+      const cs = getComputedStyle(s.c.el);
+      s.params = readContainerParams(s.c.el);
+      s.z = parseInt(cs.zIndex, 10) || 0;
+    }
     const t = chooseTier(this.scene.quality);
     if (t !== this.tier) {
       this.tier = t;
@@ -216,6 +226,7 @@ export class GasEngine {
     }
     this.n = 0;
     for (const s of this.order) {
+      s.rect = null;
       if (this.n >= MAX_CONTAINERS) break;
       const target = s.c.stateFactor() * s.params.pressure;
       const k = target > s.pv ? (s.c.stateFactor() > 1 ? 14 : 4) : 2.5; // compress fast, release slowly
@@ -235,6 +246,7 @@ export class GasEngine {
       const y0 = 1 - (r.bottom - hr.top) / this.H, y1 = 1 - (r.top - hr.top) / this.H;
       this.uR[j] = x0; this.uR[j + 1] = y0; this.uR[j + 2] = x1; this.uR[j + 3] = y1;
       const rad = parseFloat(getComputedStyle(s.c.el).borderTopLeftRadius) || 0;
+      s.rect = r; s.rad = rad;
       this.uI[j] = s.pv * df;
       this.uI[j + 1] = s.params.profile;
       this.uI[j + 2] = rad;
@@ -248,7 +260,44 @@ export class GasEngine {
       s.lastX = x0; s.lastY = y0;
       this.n++;
     }
+    this.depth();
     return moving;
+  }
+
+  /**
+   * Depth between containers. The gas of all containers is drawn in one layer under the labels, so on its own a
+   * container floating above another would not hide it. Each container that sits above a lower one gets a veil
+   * (a CSS layer inside it, clipped to the overlap) that fogs the lower container's wall, gas and label.
+   */
+  private depth(): void {
+    for (const up of this.order) {
+      let veil = '';
+      const a = up.rect;
+      if (a && !up.c.dashed() && up.pv > 0.05) {
+        let x0 = 0, y0 = 0, x1 = 0, y1 = 0, rad = 0, best = 0;
+        for (const lo of this.order) {
+          const b = lo.rect;
+          if (!b || lo === up || lo.z > up.z || up.c.el.contains(lo.c.el) || lo.c.el.contains(up.c.el)) continue;
+          // equal z-index: the later element in the document paints on top, as in CSS
+          if (lo.z === up.z && !(lo.c.el.compareDocumentPosition(up.c.el) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+          const w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (w < 1 || h < 1 || w * h <= best) continue;
+          // one veil per container: the lower container it covers most. Clipped to that container's own box,
+          // so its rounded shape shows through the upper gas
+          best = w * h; x0 = b.left; y0 = b.top; x1 = b.right; y1 = b.bottom; rad = lo.rad;
+        }
+        if (x1 > x0) {
+          const o = 1.5, f = (v: number) => Math.round(v * 2) / 2; // the veil layer is inset by 1.5px to keep the upper wall crisp
+          veil = `inset(${f(y0 - a.top - o)}px ${f(a.right - x1 - o)}px ${f(a.bottom - y1 - o)}px ${f(x0 - a.left - o)}px round ${Math.round(rad)}px)`;
+        }
+      }
+      if (veil !== up.veil) {
+        up.veil = veil;
+        const st = up.c.el.style;
+        if (veil) { st.setProperty('--_aid-veil-clip', veil); st.setProperty('--_aid-veil-d', 'block'); }
+        else { st.removeProperty('--_aid-veil-clip'); st.removeProperty('--_aid-veil-d'); }
+      }
+    }
   }
 
   private setContainers(p: Program): void {
@@ -332,7 +381,7 @@ export class GasEngine {
     const sp = sc.spectral;
     gl.uniform3f(u.tw, 1 + (RAYLEIGH[0] - 1) * sp, 1 + (RAYLEIGH[1] - 1) * sp, 1 + (RAYLEIGH[2] - 1) * sp);
     const mem = rgb(cs.getPropertyValue('--aid-membrane-color'), [24, 34, 52]);
-    const ma = parseFloat(cs.getPropertyValue('--aid-membrane-alpha')) || 0.22;
+    const ma = parseFloat(cs.getPropertyValue('--aid-membrane-alpha')) || 0.14;
     gl.uniform4f(u.mem, mem[0], mem[1], mem[2], ma);
     gl.uniform4f(u.uPtr, this.ptr.x, this.ptr.y, this.ptr.str, this.ptr.down ? 20 : 26);
     if (!this.hasFeed) { gl.clearColor(0, 0, 0, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.clear(gl.COLOR_BUFFER_BIT); }

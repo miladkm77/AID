@@ -5,10 +5,13 @@ AID is a design system whose material is a noble gas: not glass, not flat colour
 - **Not glass.** There is no surface, no specular highlight and no lens. At rest the gas veils the background without bending it; refraction appears only where the gas is disturbed.
 - **Weight.** Xenon is 4.5 times denser than air, so it settles into a layer at the bottom of its container. Helium rises. Tilt the device and the layer slides.
 - **Content is the light.** An image next to a button tints the gas that faces it.
+- **Depth.** A container that floats above another fogs the one below.
 - **Not flat.** Depth comes from density: where the gas is thicker, it scatters more and bends the background more.
 - **Honest about physics.** Every behaviour in [SPEC.md](SPEC.md) is labelled *physical*, *approximation* or *artistic*.
 
 **Live:** https://miladkm77.github.io/aid/ · lab: https://miladkm77.github.io/aid/lab.html
+
+Why it is built this way: [My gas interface looked like glass. Four things fixed it.](ARTICLE.md)
 
 ## Quick start
 

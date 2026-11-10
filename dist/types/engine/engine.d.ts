@@ -77,6 +77,12 @@ export declare class GasEngine {
     private alloc;
     private refreshParams;
     private collect;
+    /**
+     * Depth between containers. The gas of all containers is drawn in one layer under the labels, so on its own a
+     * container floating above another would not hide it. Each container that sits above a lower one gets a veil
+     * (a CSS layer inside it, clipped to the overlap) that fogs the lower container's wall, gas and label.
+     */
+    private depth;
     private setContainers;
     private use;
     private speed;
