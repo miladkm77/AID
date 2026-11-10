@@ -17,7 +17,7 @@ export interface TierConfig {
 
 export const TIERS: Record<Tier, TierConfig> = {
   static:    { grid: 0,   dprCap: 1.25, simHz: 0,  lightTaps: 5,  ambient: false },
-  efficient: { grid: 80,  dprCap: 1.5,  simHz: 30, lightTaps: 8,  ambient: false },
+  efficient: { grid: 80,  dprCap: 1.5,  simHz: 30, lightTaps: 9,  ambient: false },
   high:      { grid: 128, dprCap: 2,    simHz: 60, lightTaps: 13, ambient: true },
 };
 

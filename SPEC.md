@@ -1,8 +1,8 @@
-# AID Gas Material — Specification v0.1
+# AID Gas Material — Specification v0.2
 
-> **Summary.** AID is a user-interface material, not an effect. Every component (button, bar, tab) is a sealed container of noble gas. The look comes from a physical model: a compressible gas that gives way under a finger and settles without waves, refraction from density gradients, and scattering of the light of the content behind. Every behaviour is labelled *physical*, *approximation* or *artistic*. The material's parameters belong to AID and are set like any other CSS token.
+> **Summary.** AID is a user-interface material, not an effect. Every component (button, bar, tab) is a sealed container of noble gas. The look comes from a physical model: a compressible gas that gives way under a finger and settles without waves, a gas that pools under its own weight, takes its colour from the light of the content around it, and bends the background only where it is disturbed. Every behaviour is labelled *physical*, *approximation* or *artistic*. The material's parameters belong to AID and are set like any other CSS token.
 
-Status: draft · Reference implementation: `aid-gas` 0.1.0 (WebGL2, Web Components) · License: MIT
+Status: draft · Reference implementation: `aid-gas` 0.2.0 (WebGL2, Web Components) · License: MIT
 
 ## 1. Principle
 
@@ -12,20 +12,33 @@ The appearance is derived from a physical state, not drawn. Every behaviour is l
 - **Approximation** — physically motivated, simplified for real time; the simplification is stated.
 - **Artistic** — a design decision with no physical claim.
 
-## 2. Material model
+## 2. What makes it a gas, not a glass
 
-### 2.1 Containers
+A translucent panel that blurs and bends what is behind it reads as glass, whatever it is called. Version 0.2 removes every behaviour a lens would have and builds the look from four things only a gas does:
+
+| Signature | What you see | Why a glass cannot do it |
+|---|---|---|
+| **Settling** | Xenon pools at the bottom of its container like a fog bank with a billowing top; helium collects under the top wall. Tilt the device and the layer slides. | Glass has no weight distribution inside it. |
+| **Content light** | The gas takes the colour of the content around it, including an image that is next to the container and not under it. | A backdrop blur can only show what is directly behind it. |
+| **Disturbance-only refraction** | At rest the background is veiled but not bent. A finger or thermal motion shows up as shimmer and as light and dark streaks. | A lens bends light at its rim all the time. |
+| **Excitation** | An excited container glows in the discharge colour of its gas. | Glass does not emit. |
+
+## 3. Material model
+
+### 3.1 Containers
 
 Every component is a sealed container. The gas never leaves it, so reading areas outside containers are never distorted *(Artistic: real gas is unbounded)*. A thin membrane draws the container wall. An evacuated container (disabled) shows a dashed wall.
 
-### 2.2 Gas state
+### 3.2 Gas state
 
 The gas inside all containers of one scene is one 2D field of density ρ and velocity **v**, solved on the GPU at low resolution.
 
 | Equation | Meaning | Label |
 |---|---|---|
 | ∂ρ/∂t + ∇·(ρ**v**) = 0 | continuity: gas is moved, not created | Physical (semi-Lagrangian, not exactly conservative) |
-| ∂**v**/∂t = −c²∇ρ/ρ − γ**v** + **F** | isothermal pressure p = c²ρ, damping γ, forces | Approximation |
+| ∂**v**/∂t = −c²∇ln(ρ/ρ_eq) − γ**v** + **F** | isothermal pressure p = c²ρ and weight, applied together relative to the settled profile ρ_eq, so the settled state is an exact equilibrium of the scheme; damping γ; forces | Approximation |
+| ρ_eq ∝ exp(−h/H), H = 14 px / (weight · \|b\|), weight per container | a gas that shares its container with air settles along gravity. b is its buoyancy in air, ∝ (M − M_air): He −0.24, Ne −0.09, Ar +0.11, Kr +0.54, Xe +1. Negative gases rise. | Direction and ratios: Physical. Scale height: **Artistic** (heavy gases do pool in air, but the layer is far thicker and mixes over time) |
+| c² ∝ M^−0.22, γ ∝ M^−0.11 | light gases even out faster. The speed of sound is ∝ 1/√M (helium ≈ 5.7× xenon); the ratio is compressed to ≈ 2.2× to keep the explicit solver stable | Approximation |
 | γ ≫ c/L | over-damped: the gas settles without waves or ringing | Artistic (waves read as liquid or jelly) |
 | ρ → ρ₀ at rate k | a regulator holds each container at its set pressure | Artistic |
 | ρ ∝ p / T | ideal gas at a fixed amount | Physical |
@@ -33,7 +46,7 @@ The gas inside all containers of one scene is one 2D field of density ρ and vel
 Forces **F**:
 
 - **Finger** — a radial push around the contact point plus a drag along the pointer's motion. Under the finger the gas thins and clears; around it the gas compresses. *(Approximation)*
-- **Thermal agitation** — a divergence-free stirring field drawn from moving noise. Its speed scales with mean molecular speed ∝ √(T/M): helium moves about 5.7× faster than xenon at the same temperature. *(Speed ratio: Physical. Field shape: Approximation.)*
+- **Agitation** (`--aid-agitation`) — a divergence-free stirring field drawn from moving noise. Its speed scales with mean molecular speed ∝ √(T/M): helium moves about 5.7× faster than xenon at the same temperature. *(Speed ratio: Physical. Field shape: Approximation.)*
 
 Interaction states change density only; size and position never change:
 
@@ -45,34 +58,38 @@ Interaction states change density only; size and position never change:
 | disabled | 0 (evacuated) | dashed wall |
 | tab not selected | 0 | chamber drains |
 
-### 2.3 Optics
+### 3.3 Optics
 
-Three channels, never merged:
+Separate channels, never merged:
 
 | Channel | Model | Label |
 |---|---|---|
-| Refraction | Background displaced ∝ ∇(n), with n − 1 = c·(n_gas − n_air) (Gladstone–Dale, dilute mixture). A synthetic background-oriented schlieren. | Physical relation; amplitude **Artistic** (real displacement is sub-pixel) |
+| Refraction | Acts on the *disturbance* δ = ρ − ρ_eq only. The background is displaced ∝ ∇δ·Δn and its brightness changes ∝ −∇²δ·Δn (a shadowgraph), with Δn = n_gas − n_air (Gladstone–Dale). A fine thermal shimmer ∝ agitation · density is added. At rest δ = 0, so a container wall never acts as a lens. For helium and neon Δn is negative and the streaks invert. | Physical relations; amplitude **Artistic** (real displacement is sub-pixel) |
 | Scattering | Beer–Lambert extinction T = exp(−σρ·w_λ). The same energy is returned as in-scattered light gathered from the surrounding content. σ ∝ (n − 1)²: helium scatters ~1/380 of xenon. | Approximation (single scattering, isotropic gather) |
+| Forward scattering | What is seen through the gas loses detail with depth: the transmitted background is blurred ∝ density (up to ≈ 5 px per unit of density), so text passing behind a bar does not compete with its label. | Approximation (stands for multiple forward scattering) |
 | Absorption | Single-scattering albedo a = 1 − 0.42·smoke. Pure noble gases do not absorb visible light; absorption stands for suspended particles. | Artistic |
-| Emission | None. Noble-gas colours (neon pink, xenon blue-violet) need electrical discharge. | Physical |
+| Emission | None at rest: noble gases glow only under electrical discharge. `--aid-excitation` models that discharge as a state: the gas emits the colour of its species (He pink-orange, Ne red, Ar violet, Kr lavender, Xe blue). | Colours: Physical (published discharge colours; RGB values approximate). Use as a UI state: **Artistic** |
 | Reflection | None. A gas has no surface; Fresnel reflectance at n ≈ 1.0004 is ~4×10⁻⁸. | Physical |
 
-**Content as light.** Each point of the content behind is a light source. The gas gathers light from a disc of radius `--aid-light-reach`, weighted toward bright, saturated colours (`(0.15 + luma)·(0.35 + 2.6·saturation)`), falling off with distance. Black text emits almost nothing. An image near a container tints the gas before it passes underneath. *(Approximation; the saturation weighting is Artistic.)*
+**Content as light.** Each point of the content is a light source. The gas gathers light from rings out to `--aid-light-reach`; every ring reads a blurred copy of the content whose footprint grows with distance, so the rings overlap and no direction is missed. Samples are weighted toward bright, saturated colours (`(0.2 + luma)·(0.4 + 3·saturation)`) and fall off with distance. `--aid-glow` sets how much of the gathered colour the gas keeps. Black text emits almost nothing. An image next to a container tints the side of the gas that faces it. *(Approximation; the saturation weighting and glow gain are Artistic.)*
 
-**Scene light.** A theme-defined light (`--aid-scene-light`) is mixed in at 35% and shades the smoke texture from above, which gives the volume its relief. *(Artistic)*
+**Scene light.** A theme-defined light (`--aid-scene-light`) is mixed in at 30%. The smoke texture modulates how much light each wisp returns. Where the gas is thin only the peaks of the texture show, so the top of a settled layer billows. *(Artistic)*
 
 **Spectral weighting.** Scattering strength per channel follows λ⁻⁴ (610 / 550 / 465 nm), blended with neutral by `--aid-spectral`. At 1 the gas looks bluish against dark content and brownish against light content, as real fine smoke does. The default 0.1 keeps it near neutral grey. *(Physical direction, Artistic strength.)*
 
-## 3. Parameters (design tokens)
+## 4. Parameters (design tokens)
 
 Scene level, set on `<aid-scene>`:
 
 | Token | Range | Default | Effect |
 |---|---|---|---|
 | `--aid-gas` | helium · neon · argon · krypton · xenon | xenon | refractivity, scattering, molar mass |
-| `--aid-temperature` | 0 – 1 (250 – 400 K) | 0.45 | agitation; also lowers density (ρ ∝ p/T) |
-| `--aid-refraction` | 0 – 400 | 140 | refraction gain, same for all gases |
-| `--aid-light-reach` | px | 96 | how far content light travels into the gas |
+| `--aid-agitation` | 0 – 1 (250 – 400 K) | 0.45 | thermal motion and shimmer; also lowers density (ρ ∝ p/T). `--aid-temperature` is accepted as an alias |
+| `--aid-refraction` | 0 – 400 | 140 | gain of displacement, shimmer and shadowgraph, same for all gases |
+| `--aid-weight` | 0 – 1 | 0.6 | how strongly the gas settles; 0 fills the container evenly. Inherited: set it lower on a bar that sits over scrolling text so the gas keeps veiling what passes behind the labels |
+| `--aid-tilt` | −180° – 180° | 0 | direction of gravity. `<aid-scene tilt="device">` adds the tilt of the device |
+| `--aid-light-reach` | px | 140 | how far content light travels into the gas |
+| `--aid-glow` | 0 – 2 | 1 | how much of the gathered colour the gas keeps |
 | `--aid-smoke` | 0 – 1 | 0.5 | smoke texture and absorption |
 | `--aid-spectral` | 0 – 1 | 0.1 | λ⁻⁴ colour of scattering |
 | `--aid-quality` | auto · static · efficient · high | auto | device tier |
@@ -85,51 +102,56 @@ Container level, set on any `<aid-gas>`, `<aid-button>`, `<aid-tabs>`, `<aid-tab
 |---|---|---|---|
 | `--aid-pressure` | 0 – 2 | 1 | density held by the container |
 | `--aid-membrane` | 0 – 1 | 1 | wall visibility |
-| `--aid-profile` | 0 – 1 | 0.8 | how far from the wall the gas reaches full depth |
+| `--aid-profile` | 0 – 1 | 0.2 | softness of the gas at the wall |
+| `--aid-excitation` | 0 – 1 | 0 | glow discharge. `<aid-button>` sets 0.6 while it has keyboard focus |
 
-## 4. Gas data
+## 5. Gas data
 
-| Gas | (n−1)×10⁶ | vs air ×10⁶ | Scatter vs Xe | M g/mol | Source of n |
-|---|---|---|---|---|---|
-| Helium | 36 | −257 | 0.003 | 4.003 | List of refractive indices (589 nm, 0 °C, 1 atm) |
-| Neon | ≈67 | −226 | 0.009 | 20.18 | approximate, to verify |
-| Argon | ≈281 | −12 | 0.16 | 39.95 | approximate, to verify |
-| Krypton | ≈427 | +134 | 0.37 | 83.80 | approximate, to verify |
-| Xenon | ≈702 | +409 | 1 | 131.29 | approximate, to verify |
-| Air | 293 | 0 | — | — | List of refractive indices |
+| Gas | (n−1)×10⁶ | vs air ×10⁶ | Scatter vs Xe | M g/mol | Buoyancy vs Xe | Discharge colour | Source of n |
+|---|---|---|---|---|---|---|---|
+| Helium | 36 | −257 | 0.003 | 4.003 | −0.24 (rises) | pink-orange | List of refractive indices (589 nm, 0 °C, 1 atm) |
+| Neon | ≈67 | −226 | 0.009 | 20.18 | −0.09 (rises) | red | approximate, to verify |
+| Argon | ≈281 | −12 | 0.16 | 39.95 | +0.11 | violet | approximate, to verify |
+| Krypton | ≈427 | +134 | 0.37 | 83.80 | +0.54 | lavender | approximate, to verify |
+| Xenon | ≈702 | +409 | 1 | 131.29 | +1 (pools) | blue | approximate, to verify |
+| Air | 293 | 0 | — | 28.96 | 0 | — | List of refractive indices |
 
-Xenon is the default: the largest refraction and scattering among stable noble gases, and the slowest, calmest motion.
+Discharge colours: LibreTexts, *Gas Discharge Tubes*. Shadowgraph response to the second derivative of the refractive index: Wikipedia, *Shadowgraph*.
 
-## 5. Backdrops
+Xenon is the default: the largest refraction and scattering among stable noble gases, the heaviest layer, and the slowest, calmest motion. Helium and neon scatter so little that they are close to invisible; they show mostly as shimmer.
+
+## 6. Backdrops
 
 - `backdrop="canvas"` — the content behind is a canvas or image passed with `setBackdrop()`. Full model.
-- `backdrop="dom"` (default) — the content behind is ordinary HTML. WebGL cannot read the page, so the scene draws only the gas (lit by scene light) over it, and containers apply a CSS backdrop blur scaled by pressure as a stand-in for scattering. No refraction, no content light. *(Approximation; platform limit.)*
+- `backdrop="dom"` (default) — the content behind is ordinary HTML. WebGL cannot read the page, so the scene draws only the gas (lit by scene light) over it, and containers apply a CSS backdrop blur scaled by pressure as a stand-in for scattering. The blur is masked along gravity so it is strongest where the gas has settled. Settling, agitation and excitation work; refraction of the page and content light do not. *(Approximation; platform limit.)*
 
 Native ports can read their own layer content: SwiftUI layer effects (Metal), Android RenderEffect with AGSL, Flutter fragment shaders. The model above is platform-independent.
 
-## 6. Performance
+## 7. Performance
 
 | Tier | Grid (short side) | Sim | Light taps | Idle |
 |---|---|---|---|---|
 | static | none | off; density analytic, finger dent analytic | 5 | 0 GPU work |
-| efficient | 80 | 30 Hz (2 × 1/60 s substeps) | 8 | sleeps 2.2 s after the last change |
+| efficient | 80 | 30 Hz (2 × 1/60 s substeps) | 9 | sleeps 2.2 s after the last change |
 | high | 128 | 60 Hz | 13 | continuous gentle stirring |
 
 One simulation step = 2 full-screen passes at grid resolution (geometry, gas). No pressure solve. The render pass returns early for every pixel outside a container. `auto` picks a tier from `prefers-reduced-motion`, `deviceMemory`, `hardwareConcurrency` and pixel ratio.
 
 Not yet measured: sustained FPS, thermal and battery behaviour on real phones (5 and 15 minute sessions).
 
-## 7. Accessibility
+## 8. Accessibility
 
-- Labels sit in the DOM above the gas and are never refracted.
-- `<aid-button>`: role button, Enter / Space, `aria-disabled`. `<aid-tabs>`: role tablist, RTL-aware arrow keys.
+- Labels sit in the DOM above the gas and are never refracted. At rest the content under a container is veiled but not displaced.
+- `<aid-button>`: role button, Enter / Space, `aria-disabled`. Keyboard focus keeps the outline and adds excitation. `<aid-tabs>`: role tablist, RTL-aware arrow keys.
 - `prefers-reduced-motion` selects the static tier.
 - Open: a measured contrast floor for labels over the densest smoke, and a high-contrast mode.
 
-## 8. Open questions
+## 9. Open questions
 
 1. Verify Ne, Ar, Kr, Xe refractivity against a dispersion table.
 2. A user study: do people describe it as gas, and where does reading break?
 3. Mass conservation of the semi-Lagrangian step; a conservative scheme if drift is visible.
 4. DOM backdrop: a better scattering stand-in than a CSS blur.
 5. Device measurements for every tier.
+6. Does the settled layer read as gas on a small button, or as a gradient? It reads clearly on bars; small containers need a user test.
+7. Light from labels: a label could cast a soft shadow into the lit gas. Not modelled.

@@ -10,7 +10,7 @@ import { AidButton, AidTabs, AidTab } from './components/controls';
 export { AidScene, AidGas, AidButton, AidTabs, AidTab };
 export { GasEngine } from './engine/engine';
 export type { GasContainer, EngineStats, View } from './engine/engine';
-export { GASES, AIR_REFRACTIVITY, deltaN, scatterRelative, thermalSpeed } from './core/gases';
+export { GASES, AIR_REFRACTIVITY, AIR_MOLAR_MASS, deltaN, scatterRelative, thermalSpeed, buoyancy, responseSpeed } from './core/gases';
 export type { GasId, GasSpecies } from './core/gases';
 export { SCENE_DEFAULTS, CONTAINER_DEFAULTS, readSceneParams, readContainerParams, densityFactor, kelvin, albedo } from './core/params';
 export type { SceneParams, ContainerParams, Quality } from './core/params';
@@ -18,13 +18,12 @@ export { TIERS, chooseTier } from './core/tiers';
 export type { Tier, TierConfig } from './core/tiers';
 
 /* DOM backdrop: WebGL cannot read the page, so scattering of the content behind is approximated with a CSS
-   backdrop blur scaled by the container's pressure. Marked as an approximation in SPEC.md. */
+   backdrop blur scaled by the container's pressure. The blur is applied by each container's ::before and masked
+   along gravity, so it is strongest where the gas has settled. Marked as an approximation in SPEC.md. */
 const GLOBAL_CSS = `
-aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs){
-  -webkit-backdrop-filter:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92);
-  backdrop-filter:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92);
-}
-aid-scene:not([backdrop="canvas"]) aid-tab{-webkit-backdrop-filter:none;backdrop-filter:none}
+aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs){--_aid-bf:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92)}
+aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs)[disabled]{--_aid-bf:none}
+aid-scene:not([backdrop="canvas"]) aid-tab{--_aid-bf:none}
 `;
 
 export function define(): void {

@@ -15,15 +15,19 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-ev
  *   only the gas over it; the containers use a CSS backdrop blur as an approximation of scattering.
  * backdrop="canvas": the content behind is a canvas or image you hand over with setBackdrop(). Full model:
  *   refraction, scattering of the content's own light, absorption.
+ *
+ * tilt="device": gravity follows the device, so a heavy gas slides to the low side when the phone is tilted.
+ *   Browsers that ask for permission (iOS) need enableDeviceTilt() to be called from a tap.
  */
 export class AidScene extends HTMLElement {
   engine: GasEngine | null = null;
   private canvas: HTMLCanvasElement;
   private ro: ResizeObserver | null = null;
   private pending: Array<() => void> = [];
+  private tiltOn = false;
   error = '';
 
-  static get observedAttributes(): string[] { return ['backdrop', 'view']; }
+  static get observedAttributes(): string[] { return ['backdrop', 'view', 'tilt']; }
 
   constructor() {
     super();
@@ -53,16 +57,42 @@ export class AidScene extends HTMLElement {
     this.ro.observe(this);
     this.pending.splice(0).forEach((f) => f());
     if (document.fonts) document.fonts.ready.then(() => this.engine?.resize());
+    if (this.getAttribute('tilt') === 'device') this.listenTilt();
   }
 
   disconnectedCallback(): void {
     this.ro?.disconnect();
+    if (this.tiltOn) { window.removeEventListener('deviceorientation', this.onTilt); this.tiltOn = false; }
     this.engine?.dispose();
     this.engine = null;
   }
 
   attributeChangedCallback(name: string): void {
     if (name === 'view' && this.engine) { this.engine.view = (this.getAttribute('view') as View) || 'final'; this.engine.render(); }
+    if (name === 'tilt' && this.engine && this.getAttribute('tilt') === 'device') this.listenTilt();
+  }
+
+  private onTilt = (e: DeviceOrientationEvent): void => {
+    if (!this.engine || e.gamma == null) return;
+    const g = Math.max(-80, Math.min(80, e.gamma)); // left-right tilt of a phone held upright
+    if (Math.abs(g - this.engine.deviceTilt) < 0.7) return;
+    this.engine.deviceTilt = g;
+    this.engine.wake();
+  };
+
+  private listenTilt(): void {
+    if (this.tiltOn || typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return;
+    window.addEventListener('deviceorientation', this.onTilt);
+    this.tiltOn = true;
+  }
+
+  /** Ask for motion access where the browser requires it (call from a tap), then follow the device. Resolves to whether it is on. */
+  async enableDeviceTilt(): Promise<boolean> {
+    const D = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
+    if (!D) return false;
+    try { if (typeof D.requestPermission === 'function' && (await D.requestPermission()) !== 'granted') return false; } catch { return false; }
+    this.listenTilt();
+    return this.tiltOn;
   }
 
   get backdrop(): 'dom' | 'canvas' { return this.getAttribute('backdrop') === 'canvas' ? 'canvas' : 'dom'; }

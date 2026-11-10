@@ -8,7 +8,7 @@ export interface GasContainer {
     /** an evacuated (disabled) container shows a dashed wall */
     dashed(): boolean;
 }
-export type View = 'final' | 'density' | 'light';
+export type View = 'final' | 'density' | 'light' | 'off';
 export interface EngineStats {
     tier: Tier;
     grid: string;
@@ -34,6 +34,12 @@ export declare class GasEngine {
     private uR;
     private uI;
     private uM;
+    private uE;
+    private grav;
+    private cssAngle;
+    private cssFade;
+    /** tilt reported by the device, in degrees; added to --aid-tilt */
+    deviceTilt: number;
     private n;
     private W;
     private H;

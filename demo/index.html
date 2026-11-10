@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>AID · Demo</title>
+<title>AID Gas Lab</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 :root{
@@ -18,7 +18,7 @@
   --bg:#0C0F12; --fg:#E6EAEE; --muted:#93A0AC; --line:#262D34; --panel:#141A1F;
   --accent:#62A8E8; --app-bg:#0F1317; --app-ink:#E4E9EE; --app-sub:#93A0AC; --app-card:#171D23; --app-line:#252D35;
   --img-a:#4F86E8; --img-b:#F06A3E; --img-c:#2CC496; --img-d:#F2C24A; --img-e:#A866F0;
-  --aid-scene-light:120,130,146; --aid-membrane-color:225,232,240; --aid-membrane-alpha:.2; color-scheme:dark}}
+  --aid-scene-light:150,162,182; --aid-membrane-color:225,232,240; --aid-membrane-alpha:.2; color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);line-height:1.6;padding:20px max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px))}
 .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
@@ -29,10 +29,12 @@ h1{font-family:var(--font-head);font-size:clamp(22px,3.4vw,30px);margin:0}
 .cap{font-family:var(--font-head);font-size:13px;font-weight:600;color:var(--muted)}
 
 /* ---- the material's own tokens: set once on the scene, overridable per element ---- */
-aid-scene{--aid-gas:xenon;--aid-temperature:.45;--aid-refraction:140;--aid-light-reach:96;--aid-smoke:.5;--aid-spectral:.1;--aid-quality:auto}
+aid-scene{--aid-gas:xenon;--aid-agitation:.45;--aid-refraction:140;--aid-weight:.6;--aid-tilt:0;--aid-light-reach:140;--aid-glow:1;--aid-smoke:.5;--aid-spectral:.1;--aid-quality:auto}
 aid-gas,aid-button,aid-tabs{--aid-pressure:1}
 aid-tab{--aid-pressure:.9}
 .bar{--aid-pressure:1.2}
+/* bars sit over scrolling text, so their gas settles less and keeps veiling what passes behind the labels */
+.bar,aid-tabs{--aid-weight:.25}
 
 .phone{width:100%;max-width:360px;height:min(720px,80vh);min-height:520px;border-radius:32px;border:1px solid var(--line);background:var(--app-bg);touch-action:none;user-select:none;-webkit-user-select:none}
 .phone .bar{position:absolute;top:10px;left:10px;right:10px;height:54px;border-radius:24px;display:flex;justify-content:space-between;padding:0 18px;font-family:var(--font-head);color:var(--app-ink)}
@@ -70,8 +72,8 @@ pre{font-family:var(--font-mono);font-size:11.5px;line-height:1.65;direction:ltr
 <body>
 <div class="wrap">
   <header style="display:flex;flex-direction:column;gap:6px">
-    <h1>AID · a gas material for interfaces</h1>
-    <p class="lead">Both phones are built only from <code>&lt;aid-scene&gt;</code>, <code>&lt;aid-button&gt;</code> and <code>&lt;aid-tabs&gt;</code>. On the left the content behind the gas is drawn on a canvas, so the full model runs. On the right it is real HTML, which is the mode a panel or a website uses.</p>
+    <h1>AID · a gas material for interfaces <span style="font-weight:400;color:var(--muted);font-size:.6em">v0.2 · volume model</span></h1>
+    <p class="lead">Both phones are built only from <code>&lt;aid-scene&gt;</code>, <code>&lt;aid-button&gt;</code> and <code>&lt;aid-tabs&gt;</code>. On the left the content behind the gas is drawn on a canvas, so the full model runs. On the right it is real HTML, which is the mode a panel or a website uses. The gas is a volume, not a lens: it pools under its own weight, takes its colour from the content around it, and bends the background only where it is disturbed.</p>
   </header>
 
   <div class="lab">
@@ -79,7 +81,7 @@ pre{font-family:var(--font-mono);font-size:11.5px;line-height:1.65;direction:ltr
       <span class="cap">backdrop="canvas" · full model</span>
       <aid-scene class="phone" id="sceneA" backdrop="canvas">
         <aid-gas class="bar"><b>Files</b><span>14:24</span></aid-gas>
-        <aid-button class="inl" id="inA">Approve</aid-button>
+        <aid-button class="inl approve" id="inA">Approve</aid-button>
         <aid-button class="inl" id="inB" style="--aid-pressure:.55">Draft</aid-button>
         <aid-button class="inl" id="inC" disabled>Send</aid-button>
         <aid-button class="fab" aria-label="New file">+</aid-button>
@@ -109,15 +111,21 @@ pre{font-family:var(--font-mono);font-size:11.5px;line-height:1.65;direction:ltr
           <button type="button" data-g="xenon" aria-pressed="true">Xe</button>
         </div></div>
       <div class="param"><label for="tP">--aid-pressure (bars)</label><output id="oP"></output><input type="range" id="tP" min="0.1" max="2" step="0.01" value="1.2"></div>
-      <div class="param"><label for="tT">--aid-temperature</label><output id="oT"></output><input type="range" id="tT" min="0" max="1" step="0.01" value="0.45"></div>
+      <div class="param"><label for="tT">--aid-agitation</label><output id="oT"></output><input type="range" id="tT" min="0" max="1" step="0.01" value="0.45"></div>
       <div class="param"><label for="tR">--aid-refraction</label><output id="oR"></output><input type="range" id="tR" min="0" max="400" step="5" value="140"></div>
-      <div class="param"><label for="tL">--aid-light-reach</label><output id="oL"></output><input type="range" id="tL" min="0" max="200" step="2" value="96"></div>
+      <div class="param"><label for="tW">--aid-weight (buttons)</label><output id="oW"></output><input type="range" id="tW" min="0" max="1" step="0.01" value="0.6"></div>
+      <div class="param"><label for="tB">--aid-weight (bars)</label><output id="oB"></output><input type="range" id="tB" min="0" max="1" step="0.01" value="0.25"></div>
+      <div class="param"><label for="tG">--aid-tilt</label><output id="oG"></output><input type="range" id="tG" min="-70" max="70" step="1" value="0"></div>
+      <div class="chips"><button type="button" id="devTilt" aria-pressed="false">follow device tilt</button></div>
+      <div class="param"><label for="tL">--aid-light-reach</label><output id="oL"></output><input type="range" id="tL" min="0" max="260" step="2" value="140"></div>
+      <div class="param"><label for="tO">--aid-glow</label><output id="oO"></output><input type="range" id="tO" min="0" max="2" step="0.01" value="1"></div>
+      <div class="param"><label for="tE">--aid-excitation (Approve)</label><output id="oE"></output><input type="range" id="tE" min="0" max="1" step="0.01" value="0"></div>
       <div class="param"><label for="tS">--aid-smoke</label><output id="oS"></output><input type="range" id="tS" min="0" max="1" step="0.01" value="0.5"></div>
       <div class="param"><label for="tX">--aid-spectral</label><output id="oX"></output><input type="range" id="tX" min="0" max="1" step="0.01" value="0.1"></div>
       <div class="col"><span class="cap">--aid-quality</span>
         <div class="chips" id="qRow"><button type="button" data-q="auto" aria-pressed="true">auto</button><button type="button" data-q="static" aria-pressed="false">static</button><button type="button" data-q="efficient" aria-pressed="false">efficient</button><button type="button" data-q="high" aria-pressed="false">high</button></div></div>
       <div class="col"><span class="cap">view</span>
-        <div class="chips" id="vRow"><button type="button" data-v="final" aria-pressed="true">final</button><button type="button" data-v="density" aria-pressed="false">density</button><button type="button" data-v="light" aria-pressed="false">light</button></div></div>
+        <div class="chips" id="vRow"><button type="button" data-v="final" aria-pressed="true">final</button><button type="button" data-v="density" aria-pressed="false">density</button><button type="button" data-v="light" aria-pressed="false">light</button><button type="button" data-v="off" aria-pressed="false">no gas</button></div></div>
       <pre id="css"></pre>
       <pre id="stats">…</pre>
     </div>
@@ -145,14 +153,15 @@ function drawFeed(){
   fx.fillStyle=ink;fx.font='800 23px Inter,system-ui';fx.fillText('Today, 5 November',pad+4,y+26);
   fx.fillStyle=sub;fx.font='400 14px Inter,system-ui';fx.fillText('12 cases waiting for review',pad+4,y+50);y+=74;
   for(let i=0;i<10;i++){
-    const img=i%3!==1;let h=img?318:208;if(i===1||i===4)h+=58;
+    const img=i%3!==1;let h=img?318:208;if(i===0||i===4)h+=58;
     fx.fillStyle=card;rr(pad,y,cw,h,18);fx.fill();fx.strokeStyle=line;fx.stroke();
     let cy=y+14;
     if(img){const g=fx.createLinearGradient(pad,cy,pad+cw,cy+130);g.addColorStop(0,I[i%5]);g.addColorStop(1,I[(i+2)%5]);fx.fillStyle=g;rr(pad+12,cy,cw-24,130,12);fx.fill();
       const sx=pad+70+(i*37)%120,s=fx.createRadialGradient(sx,cy+62,4,sx,cy+62,44);s.addColorStop(0,'rgba(255,255,240,1)');s.addColorStop(1,'rgba(255,255,240,0)');fx.fillStyle=s;fx.fillRect(pad+12,cy,cw-24,130);cy+=146;}
+    if(i===0){INL.inA=INL.inB=cy-4;cy+=58;}   /* the actions sit right under the image, so its light reaches them */
     fx.fillStyle=ink;fx.font='800 16px Inter,system-ui';fx.fillText('Case '+(1248+i)+' · '+hosp[i%4]+' Hospital',pad+12,cy+16);
     fx.fillStyle=sub;fx.font='400 14px Inter,system-ui';const nl=img?3:4;for(let l=0;l<nl;l++)fx.fillText(lines[l],pad+12,cy+42+l*23);cy+=42+nl*23;
-    if(i===1)INL.inA=INL.inB=cy+14; if(i===4)INL.inC=cy+14;
+    if(i===4)INL.inC=cy+14;
     y+=h+14;
   }
   feedH=Math.max(feedH,y+100);
@@ -180,19 +189,24 @@ const feedB=document.getElementById('feedB');
 const grads=[['--img-a','--img-c'],['--img-b','--img-d'],['--img-c','--img-e'],['--img-d','--img-a'],['--img-e','--img-b']];
 feedB.innerHTML='<h2 style="font-family:var(--font-head);font-size:23px;margin:4px 4px 0;color:var(--app-ink)">Today, 5 November</h2><p style="margin:0 4px 12px;color:var(--app-sub)">12 cases waiting for review</p>'+
   Array.from({length:10},(_,i)=>`<article class="card">${i%3!==1?`<div class="img" style="background:linear-gradient(110deg,var(${grads[i%5][0]}),var(${grads[i%5][1]}))"></div>`:''}
+  ${i===0?'<div class="row"><aid-button class="approve">Approve</aid-button><aid-button style="--aid-pressure:.55">Draft</aid-button></div>':''}
   <h3>Case ${1248+i} · ${hosp[i%4]} Hospital</h3><p>${lines.slice(0,3).join(' ')}</p>
-  ${i===1?'<div class="row"><aid-button>Approve</aid-button><aid-button style="--aid-pressure:.55">Draft</aid-button></div>':''}
   ${i===4?'<div class="row"><aid-button disabled>Send</aid-button></div>':''}</article>`).join('');
 feedB.addEventListener('scroll',()=>B.wake(),{passive:true});
 
 /* ---------- panel: every control writes a CSS custom property ---------- */
 const scenes=[A,B],css=document.getElementById('css');
-function show(){const cs=getComputedStyle(A);css.textContent=['--aid-gas','--aid-temperature','--aid-refraction','--aid-light-reach','--aid-smoke','--aid-spectral','--aid-quality'].map(n=>`${n}: ${cs.getPropertyValue(n).trim()};`).join('\n')+`\n.bar { --aid-pressure: ${getComputedStyle(document.querySelector('.bar')).getPropertyValue('--aid-pressure').trim()}; }`;}
+function show(){const cs=getComputedStyle(A);css.textContent=['--aid-gas','--aid-agitation','--aid-refraction','--aid-weight','--aid-tilt','--aid-light-reach','--aid-glow','--aid-smoke','--aid-spectral','--aid-quality'].map(n=>`${n}: ${cs.getPropertyValue(n).trim()};`).join('\n')+`\n.bar { --aid-pressure: ${getComputedStyle(document.querySelector('.bar')).getPropertyValue('--aid-pressure').trim()}; --aid-weight: ${getComputedStyle(document.querySelector('.bar')).getPropertyValue('--aid-weight').trim()}; }`;}
 function setVar(n,v){scenes.forEach(s=>{s.style.setProperty(n,v);s.wake();});show();}
 const bindR=(id,name,fmt,target)=>{const i=document.getElementById('t'+id),o=document.getElementById('o'+id);const f=()=>{o.textContent=fmt(+i.value);
-  if(target)document.querySelectorAll(target).forEach(e=>e.style.setProperty(name,i.value));else setVar(name,i.value);scenes.forEach(s=>s.wake());show();};i.addEventListener('input',f);f();};
+  if(target)document.querySelectorAll(target).forEach(e=>{if(name==='--aid-excitation'&&+i.value===0)e.style.removeProperty(name);else e.style.setProperty(name,i.value);});else setVar(name,i.value);scenes.forEach(s=>s.wake());show();};i.addEventListener('input',f);f();};
 bindR('P','--aid-pressure',v=>v.toFixed(2),'.bar,aid-tabs');
-bindR('T','--aid-temperature',v=>Math.round(250+150*v)+' K');
+bindR('T','--aid-agitation',v=>v.toFixed(2)+' · '+Math.round(250+150*v)+' K');
+bindR('W','--aid-weight',v=>v.toFixed(2));
+bindR('B','--aid-weight',v=>v.toFixed(2),'.bar,aid-tabs');
+bindR('G','--aid-tilt',v=>v+'°');
+bindR('O','--aid-glow',v=>v.toFixed(2));
+bindR('E','--aid-excitation',v=>v.toFixed(2),'.approve');
 bindR('R','--aid-refraction',v=>'×'+v);
 bindR('L','--aid-light-reach',v=>v+'px');
 bindR('S','--aid-smoke',v=>v.toFixed(2));
@@ -201,6 +215,7 @@ const chips=(rowId,attr,apply)=>{const row=document.getElementById(rowId);row.qu
 chips('gasRow','g',g=>setVar('--aid-gas',g));
 chips('qRow','q',q=>setVar('--aid-quality',q));
 chips('vRow','v',v=>scenes.forEach(s=>s.setAttribute('view',v)));
+const dv=document.getElementById('devTilt');dv.addEventListener('click',async()=>{const on=(await Promise.all(scenes.map(s=>s.enableDeviceTilt()))).some(Boolean);dv.setAttribute('aria-pressed',String(on));dv.textContent=on?'following device tilt':'device tilt not available here';});
 const st=document.getElementById('stats'),last={};
 const fmt=s=>`${s.tier.padEnd(9)} grid ${s.grid.padEnd(8)} sim ${String(s.simHz||'off').padEnd(3)} fps ${s.fps?s.fps.toFixed(0):'–'}  ${s.state}${s.error?'  ERR '+s.error:''}`;
 const upd=()=>{st.textContent='canvas  '+(last.A?fmt(last.A):'…')+'\ndom     '+(last.B?fmt(last.B):'…');};

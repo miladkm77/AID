@@ -1,6 +1,6 @@
 import { GL, Program, PingPong, Target } from '../gl/gl';
 import { VERTEX, GEO, GAS, RENDER, MAX_CONTAINERS } from '../gl/shaders';
-import { GASES, deltaN, scatterRelative, thermalSpeed } from '../core/gases';
+import { GASES, deltaN, scatterRelative, thermalSpeed, buoyancy, responseSpeed } from '../core/gases';
 import { SceneParams, ContainerParams, readSceneParams, readContainerParams, densityFactor, albedo, SCENE_DEFAULTS, CONTAINER_DEFAULTS } from '../core/params';
 import { Tier, TIERS, chooseTier } from '../core/tiers';
 
@@ -13,7 +13,10 @@ export interface GasContainer {
   dashed(): boolean;
 }
 
-export type View = 'final' | 'density' | 'light';
+export type View = 'final' | 'density' | 'light' | 'off';
+
+/** scale height of xenon at --aid-weight: 1, in CSS px (artistic: the real value is kilometres) */
+const SCALE_HEIGHT = 14;
 
 export interface EngineStats {
   tier: Tier;
@@ -30,6 +33,8 @@ interface Slot {
   c: GasContainer;
   params: ContainerParams;
   pv: number;
+  ev: number;
+  wv: number;
   lastX: number;
   lastY: number;
   accX: number;
@@ -57,6 +62,12 @@ export class GasEngine {
   private uR = new Float32Array(MAX_CONTAINERS * 4);
   private uI = new Float32Array(MAX_CONTAINERS * 4);
   private uM = new Float32Array(MAX_CONTAINERS * 4);
+  private uE = new Float32Array(MAX_CONTAINERS * 4);
+  private grav = { x: 0, y: -1, k: 0 };
+  private cssAngle = NaN;
+  private cssFade = NaN;
+  /** tilt reported by the device, in degrees; added to --aid-tilt */
+  deviceTilt = 0;
   private n = 0;
 
   private W = 0;
@@ -104,7 +115,7 @@ export class GasEngine {
   /* ---------------- containers ---------------- */
   add(c: GasContainer): void {
     if (this.slots.has(c)) return;
-    const s: Slot = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
+    const s: Slot = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, ev: 0, wv: CONTAINER_DEFAULTS.weight, lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
     this.slots.set(c, s);
     this.order.push(s);
     this.refreshParams(true);
@@ -187,6 +198,22 @@ export class GasEngine {
     const hr = this.host.getBoundingClientRect();
     const df = densityFactor(this.scene.temperature);
     let moving = false;
+    // gravity: heavy gases settle along it, light gases against it
+    const b = buoyancy(GASES[this.scene.gas]);
+    const th = (this.scene.tilt + this.deviceTilt) * Math.PI / 180;
+    const sgn = b < 0 ? -1 : 1;
+    const gx = Math.sin(th) * sgn, gy = -Math.cos(th) * sgn, gk = Math.abs(b) / SCALE_HEIGHT;
+    const e = dt > 0 ? 1 - Math.exp(-dt * 5) : 1;
+    const G = this.grav;
+    if (Math.abs(gx - G.x) + Math.abs(gy - G.y) + Math.abs(gk - G.k) * SCALE_HEIGHT > 0.002) moving = true;
+    G.x += (gx - G.x) * e; G.y += (gy - G.y) * e; G.k += (gk - G.k) * e;
+    // the DOM-backdrop blur follows the settled gas: direction and depth as CSS variables on the scene
+    const ang = Math.round(Math.atan2(-gx, -gy) * 180 / Math.PI), fade = Math.round(Math.min(3 / gk, 9999));
+    if (ang !== this.cssAngle || fade !== this.cssFade) {
+      this.cssAngle = ang; this.cssFade = fade;
+      this.host.style.setProperty('--_aid-angle', ang + 'deg');
+      this.host.style.setProperty('--_aid-fade-unit', fade + 'px');
+    }
     this.n = 0;
     for (const s of this.order) {
       if (this.n >= MAX_CONTAINERS) break;
@@ -194,6 +221,11 @@ export class GasEngine {
       const k = target > s.pv ? (s.c.stateFactor() > 1 ? 14 : 4) : 2.5; // compress fast, release slowly
       s.pv += (target - s.pv) * (dt > 0 ? 1 - Math.exp(-dt * k) : 1);
       if (Math.abs(target - s.pv) > 0.003) moving = true;
+      const et = s.c.dashed() ? 0 : s.params.excitation;
+      s.ev += (et - s.ev) * (dt > 0 ? 1 - Math.exp(-dt * 7) : 1);
+      if (Math.abs(et - s.ev) > 0.003) moving = true;
+      s.wv += (s.params.weight - s.wv) * e;
+      if (Math.abs(s.params.weight - s.wv) > 0.003) moving = true;
       const r = s.c.el.getBoundingClientRect();
       if (r.width < 1 || r.bottom < hr.top || r.top > hr.bottom || r.right < hr.left || r.left > hr.right) continue;
       const empty = s.pv < 0.004 && !s.c.dashed();
@@ -206,6 +238,8 @@ export class GasEngine {
       this.uI[j] = s.pv * df;
       this.uI[j + 1] = s.params.profile;
       this.uI[j + 2] = rad;
+      this.uE[j] = s.ev * Math.min(1, s.pv);
+      this.uE[j + 1] = s.wv;
       this.uI[j + 3] = (s.c.dashed() ? -1 : 1) * s.params.membrane * Math.min(1, s.c.dashed() ? 1 : s.pv * 1.5);
       const mx = isNaN(s.lastX) ? 0 : x0 - s.lastX, my = isNaN(s.lastY) ? 0 : y0 - s.lastY;
       s.accX += mx; s.accY += my;
@@ -222,6 +256,8 @@ export class GasEngine {
     if (u.uR) gl.uniform4fv(u.uR, this.uR);
     if (u.uI) gl.uniform4fv(u.uI, this.uI);
     if (u.uM) gl.uniform4fv(u.uM, this.uM);
+    if (u.uE) gl.uniform4fv(u.uE, this.uE);
+    if (u.uGv) gl.uniform3f(u.uGv, this.grav.x, this.grav.y, this.grav.k);
     if (u.uN) gl.uniform1i(u.uN, this.n);
     if (u.uPx) gl.uniform2f(u.uPx, this.W, this.H);
     if (u.texel) gl.uniform2f(u.texel, 1 / this.SW, 1 / this.SH);
@@ -249,8 +285,9 @@ export class GasEngine {
     gl.uniform1i(u.uNz, g.bind(2, this.noise));
     const sp = this.speed();
     gl.uniform1f(u.dt, dt);
-    gl.uniform1f(u.c2, 900);
-    gl.uniform1f(u.gam, 5.5);
+    const rs = responseSpeed(GASES[this.scene.gas]); // light gases even out faster and stop sooner
+    gl.uniform1f(u.c2, 600 * rs);
+    gl.uniform1f(u.gam, 4.2 * Math.sqrt(rs));
     gl.uniform1f(u.tAmp, this.scene.temperature * 16 * Math.min(sp, 3));
     gl.uniform1f(u.tSpd, 1.6 * sp);
     gl.uniform1f(u.t, this.time);
@@ -270,12 +307,16 @@ export class GasEngine {
     gl.uniform1i(u.uFeed, g.bind(0, this.feedTex));
     gl.uniform1i(u.uS, g.bind(1, this.st.read.tex));
     gl.uniform1i(u.uNz, g.bind(2, this.noise));
+    gl.uniform1i(u.uGt, g.bind(3, this.geo!.tex));
     gl.uniform1f(u.scr, this.hasFeed ? this.backdropScroll / this.feedH : 0);
     gl.uniform1f(u.vf, this.hasFeed ? this.H / this.feedH : 1);
     gl.uniform1f(u.amp, sc.refraction);
     gl.uniform1f(u.dn, deltaN(gas));
-    gl.uniform1f(u.sig, 1.15 * scatterRelative(gas));
-    gl.uniform1f(u.lod, Math.log2(14 * this.feedDpr));
+    gl.uniform1f(u.sig, 1.5 * scatterRelative(gas));
+    gl.uniform1f(u.fdpr, this.feedDpr);
+    gl.uniform1f(u.agit, sc.temperature);
+    gl.uniform1f(u.glow, sc.glow);
+    gl.uniform3f(u.emis, gas.emission[0] / 255, gas.emission[1] / 255, gas.emission[2] / 255);
     gl.uniform1f(u.smoke, sc.smoke);
     gl.uniform1f(u.reach, sc.lightReach);
     gl.uniform1f(u.flowT, this.flowT);
@@ -283,14 +324,13 @@ export class GasEngine {
     gl.uniform1f(u.hasFeed, this.hasFeed ? 1 : 0);
     gl.uniform1f(u.alb, albedo(sc.smoke));
     gl.uniform1i(u.taps, TIERS[this.tier].lightTaps);
-    gl.uniform1i(u.mode, this.view === 'density' ? 1 : this.view === 'light' ? 2 : 0);
+    gl.uniform1i(u.mode, this.view === 'density' ? 1 : this.view === 'light' ? 2 : this.view === 'off' ? 3 : 0);
     const cs = getComputedStyle(this.host);
     const scene = rgb(cs.getPropertyValue('--aid-scene-light'), [246, 248, 251]);
     gl.uniform3f(u.scene, scene[0], scene[1], scene[2]);
-    gl.uniform1f(u.smix, 0.35);
+    gl.uniform1f(u.smix, 0.3);
     const sp = sc.spectral;
     gl.uniform3f(u.tw, 1 + (RAYLEIGH[0] - 1) * sp, 1 + (RAYLEIGH[1] - 1) * sp, 1 + (RAYLEIGH[2] - 1) * sp);
-    gl.uniform2f(u.ldir, -0.35, 0.9);
     const mem = rgb(cs.getPropertyValue('--aid-membrane-color'), [24, 34, 52]);
     const ma = parseFloat(cs.getPropertyValue('--aid-membrane-alpha')) || 0.22;
     gl.uniform4f(u.mem, mem[0], mem[1], mem[2], ma);

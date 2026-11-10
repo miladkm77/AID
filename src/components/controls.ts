@@ -7,7 +7,7 @@ import { AidGas } from './gas';
 export class AidButton extends AidGas {
   protected extraCss(): string {
     return ':host{cursor:pointer;user-select:none;-webkit-user-select:none;font:inherit;color:inherit;min-height:44px;padding:0 20px;border-radius:999px}' +
-      ':host([disabled]){cursor:not-allowed;opacity:.6}:host(:focus-visible){outline:2px solid currentColor;outline-offset:4px}';
+      ':host([disabled]){cursor:not-allowed;opacity:.6}:host(:focus-visible){outline:2px solid currentColor;outline-offset:4px;--aid-excitation:.6}';
   }
 
   connectedCallback(): void {

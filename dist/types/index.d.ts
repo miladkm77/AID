@@ -9,7 +9,7 @@ import { AidButton, AidTabs, AidTab } from './components/controls';
 export { AidScene, AidGas, AidButton, AidTabs, AidTab };
 export { GasEngine } from './engine/engine';
 export type { GasContainer, EngineStats, View } from './engine/engine';
-export { GASES, AIR_REFRACTIVITY, deltaN, scatterRelative, thermalSpeed } from './core/gases';
+export { GASES, AIR_REFRACTIVITY, AIR_MOLAR_MASS, deltaN, scatterRelative, thermalSpeed, buoyancy, responseSpeed } from './core/gases';
 export type { GasId, GasSpecies } from './core/gases';
 export { SCENE_DEFAULTS, CONTAINER_DEFAULTS, readSceneParams, readContainerParams, densityFactor, kelvin, albedo } from './core/params';
 export type { SceneParams, ContainerParams, Quality } from './core/params';
