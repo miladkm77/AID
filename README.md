@@ -1,17 +1,36 @@
 # AID · Atmospheric Interface Design
 
-AID is a design system whose material is a noble gas: not glass, not flat colour. Every button, bar and tab is a sealed container of gas. The gas pools under its own weight, a finger pushes it aside, it settles back without waves, and the colours of the content around it light it up. Xenon is the default gas.
+**An interface language made of gas.** Every control is a sealed container of noble gas, and interface state is the state of that gas: a pressed button is compressed gas, a disabled one is a vacuum, a focused one glows in the colour of its element.
 
-- **Not glass.** There is no surface, no specular highlight and no lens. At rest the gas veils the background without bending it; refraction appears only where the gas is disturbed.
-- **Weight.** Xenon is 4.5 times denser than air, so it settles into a layer at the bottom of its container. Helium rises. Tilt the device and the layer slides.
-- **Content is the light.** An image next to a button tints the gas that faces it.
-- **Depth.** A container that floats above another fogs the one below.
-- **Not flat.** Depth comes from density: where the gas is thicker, it scatters more and bends the background more.
-- **Honest about physics.** Every behaviour in [SPEC.md](SPEC.md) is labelled *physical*, *approximation* or *artistic*.
+![AID: sealed containers of xenon over a colourful page](docs/img/00-hero.png)
 
-**Live:** https://miladkm77.github.io/aid/ · lab: https://miladkm77.github.io/aid/lab.html
+**[Read the article](ARTICLE.md)** · **[Live lab](https://miladkm77.github.io/aid/lab.html)** · **[Specification](SPEC.md)**
 
-Why it is built this way: [My gas interface looked like glass. Four things fixed it.](ARTICLE.md)
+![The gas slides as the device tilts](docs/img/tilt.gif)
+
+## What a gas does that glass cannot
+
+- **It has weight.** Xenon is 4.5 times denser than air, so it settles into a layer at the bottom of its container. Helium rises. Tilt the device and the layer slides.
+- **It is lit by its surroundings.** An image next to a button tints the gas that faces it.
+- **It bends light only where it is disturbed.** At rest the gas veils the background without distorting it. A finger or thermal motion shows as shimmer and as light and dark streaks.
+- **It can be excited.** A focused control glows in the discharge colour of its gas: xenon blue, neon red, argon violet.
+- **It has depth.** A container that floats above another fogs the one below.
+
+## The grammar
+
+| Interface meaning | Physical quantity | Token or state |
+|---|---|---|
+| Emphasis | Pressure | `--aid-pressure` |
+| Pressed | Compression | pointer down |
+| Disabled | Vacuum | `disabled` |
+| Selected | A filled chamber | `<aid-tab selected>` |
+| Focus | Excitation | `--aid-excitation`, keyboard focus |
+| Elevation | Fogging | `z-index` |
+| Context | Illumination | `--aid-light-reach`, `--aid-glow` |
+| Orientation | Weight | `--aid-weight`, `--aid-tilt`, `tilt="device"` |
+| Activity | Agitation | `--aid-agitation` |
+
+Every behaviour is labelled *physical*, *approximation* or *artistic* in [SPEC.md](SPEC.md).
 
 ## Quick start
 

@@ -1,120 +1,161 @@
-# My gas interface looked like glass. Four things fixed it.
+# AID: an interface language made of gas
 
-*Notes from building AID, an interface material made of noble gas.*
+*Atmospheric Interface Design is a material with weight, pressure and light, and a grammar that maps interface state onto the physics of a gas.*
 
-A few weeks ago I asked a simple question: what if a button was not a slab of glass, but a sealed chamber of gas?
+![AID: sealed containers of xenon over a colourful page](docs/img/00-hero.png)
 
-I built it. It had a compressible gas simulation, refraction derived from real refractive indices, and light scattering. I was proud of the physics.
+Every major interface language is built on a metaphor of matter.
 
-Then I looked at the result honestly, and it looked like Liquid Glass.
+Material Design chose paper and ink. Fluent chose acrylic, which Microsoft describes as replicating "the effect of frosted glass", and mica. In 2025 Apple introduced Liquid Glass, a material that is "translucent and behaves like glass in the real world".
 
-![Before and after: the lens model next to the volume model](docs/img/01-before-after.png)
+Paper, acrylic, mica, glass. Every one of them is a solid. A solid has a surface and a shape, and that is all it has. Nothing inside it can move, compress, heat up or glow.
 
-*Left: the first version. Right: the current one. Same content, same gas (xenon), same components.*
+AID starts from a state of matter that, as far as I can find, no interface language has been built on: **gas**. Specifically the noble gases, helium to xenon, because they are colourless, inert, and differ from each other in exactly the ways a designer can use.
 
-## Why it read as glass
+## The idea in one paragraph
 
-A translucent shape that blurs and bends whatever is behind it reads as glass. It does not matter what the code calls it.
+In AID every control is a sealed, transparent container holding a quantity of gas. The gas has real properties: a density, a weight relative to air, a refractive index, a temperature. Interface state is not painted on top of the control. It *is* the state of the gas. A pressed button is compressed gas. A disabled button is a vacuum. A focused button is an excited gas, glowing in the colour of its element.
 
-My gas got denser from the wall of the container toward the middle. That density slope bent the background most strongly at the rim, which is exactly what a lens does. And my "light from the content" was, in practice, a blur of whatever sat directly underneath.
+That mapping is what makes AID a language and not a visual effect.
 
-So I stopped asking how to render gas, and asked a different question: **what does a gas do that a piece of glass cannot?**
+## The grammar: state is a physical quantity
 
-I found four answers. Each one became a behaviour of the material, and where it needed one, a parameter.
+| Interface meaning | Physical quantity | What you see | Status |
+|---|---|---|---|
+| Emphasis | Pressure | More gas in the container, a deeper layer | Implemented |
+| Pressed | Compression | The gas thins under the finger and piles up around it | Implemented |
+| Disabled | Vacuum | An evacuated container with a dashed wall | Implemented |
+| Selected | A filled chamber | The selected tab holds gas, the others are drained | Implemented |
+| Focus | Excitation | The gas glows in its discharge colour | Implemented |
+| Elevation | Fogging | A container above another veils the one below | Implemented, as an approximation |
+| Context | Illumination | The gas takes the colour of the content near it | Implemented on canvas backdrops |
+| Orientation | Weight | The layer of gas follows gravity and the tilt of the device | Implemented |
+| Activity | Agitation | Faster thermal motion and shimmer | Parameter exists; not yet bound to a state |
 
-## 1. A gas has weight
+Each row is one variable. Nothing is animated for decoration: when something moves, a physical quantity changed.
 
-Xenon is about 4.5 times denser than air. Heavy gases pool. There is a classic demonstration where a foil boat floats in an apparently empty tank, on an invisible layer of sulfur hexafluoride.
+## Four things a gas does that a solid cannot
 
-So the gas in an AID container is no longer spread evenly. Xenon settles into a layer at the bottom with a soft, billowing top, like fog in a valley. Helium is lighter than air, so it collects under the top wall. How strongly each gas settles follows its real molar mass relative to air.
+### 1. It has weight
 
-And because the layer follows gravity, it can follow the device. Tilt the phone and the gas slides to the low side.
+Xenon is about 4.5 times denser than air, and heavy gases pool. In a well-known demonstration a foil boat floats in an apparently empty tank, on an invisible layer of sulfur hexafluoride.
 
-![The settled layer when level, and when the device is tilted](docs/img/03-tilt.png)
+So the gas in an AID container is not spread evenly. Xenon settles into a layer at the bottom with a soft, billowing top, like fog in a valley. Helium is lighter than air and collects under the top wall. How strongly each gas settles follows its real molar mass relative to air.
 
-*`--aid-weight` sets how strongly the gas settles. `--aid-tilt`, or the device itself, sets the direction of gravity.*
+Because the layer follows gravity, it follows the device. Tilt the phone and the gas slides to the low side.
 
-A piece of glass has nothing inside it that could move.
+![The gas slides as the device tilts](docs/img/tilt.gif)
 
-## 2. A gas is lit by its surroundings
+### 2. It is lit by what surrounds it
 
 A noble gas is colourless and has no light of its own. What you see of a fog is the light it catches.
 
-In AID every colour on the screen is a light source. The gas gathers light from a radius around each container and takes on that colour. The important part is "around": an image that is *next to* a button tints the side of the gas that faces it. A backdrop blur can only show what is directly behind the element.
+In AID every colour on the screen is a light source. The gas gathers light from a radius around its container and takes on that colour. An image that is *next to* a button, not under it, still tints the side of the gas that faces it.
 
-![The same screen in three views: final, density, and light](docs/img/02-views.png)
+![One screen in three views: final, density of the gas, and the light it gathers](docs/img/02-views.png)
 
-*Final, the density of the gas alone, and the light the gas picks up. The buttons sit under the image, not on it, and still take its blue.*
+*Final, the density of the gas alone, and the light the gas picks up. The buttons sit below the image and still take its blue.*
 
-## 3. A gas refracts only where it is disturbed
+### 3. It bends light only where it is disturbed
 
-This was the change that removed the glass look.
+A lens bends light at its rim all the time. A gas at rest does not.
 
-At rest, the gas now veils what is behind it but does not bend it. Text under a bar gets softer and dimmer with depth, and nothing is distorted at the wall.
+At rest, an AID container veils what is behind it and softens it with depth, but does not distort it. Refraction is reserved for disturbance. When a finger pushes the gas, or thermal motion stirs it, the density changes, and only that change bends light. It is drawn as a small displacement and as a shadowgraph, the technique used to photograph shock waves and the heat rising from a flame.
 
-Refraction is reserved for disturbance. When a finger pushes the gas, or thermal motion stirs it, the density changes, and only that change bends light. I render it two ways: as a small displacement of the background, and as a shadowgraph. A shadowgraph is the technique used to photograph shock waves and the heat rising from a candle; its brightness follows the second derivative of the refractive index.
+The gas is heavily damped. It settles without ringing, because waves read as liquid.
 
-![Pressing a bar and releasing it](docs/img/06-press.png)
+![Pressing a bar, and half a second after release](docs/img/06-press.png)
 
-*The gas is pushed aside and settles back. It is heavily damped, so it never rings or wobbles: waves read as liquid.*
+### 4. It can be excited
 
-## 4. A noble gas can be excited
-
-Noble gases are famous for one thing: run a current through them and they glow, each in its own colour. Neon is red, argon violet, xenon blue.
-
-AID has a parameter for that, `--aid-excitation`. I use it as a state. A button that has keyboard focus glows in the colour of its gas.
+Run a current through a noble gas and it glows in the colour of its element: neon red, argon violet, xenon blue. AID treats that as a state. A control with keyboard focus glows in the colour of the gas it holds.
 
 ![An excited button in xenon and in neon](docs/img/04-excitation.png)
 
-*Same button, same parameter, different gas.*
+## Five gases, five temperaments
 
-## Parameters that belong to the material
+The gas is a theme. The values below are physical constants, not style choices.
 
-I did not want to rename blur radius and call it new. These are the material's own controls, set in CSS like any other token:
+| Gas | Refractivity (n−1)×10⁶ | Molar mass | Motion vs xenon | In air | Discharge colour |
+|---|---|---|---|---|---|
+| Helium | 36 | 4.0 | 5.7× | rises | pink-orange |
+| Neon | ≈67 | 20.2 | 2.5× | rises slightly | red |
+| Argon | ≈281 | 39.9 | 1.8× | sinks slightly | violet |
+| Krypton | ≈427 | 83.8 | 1.3× | sinks | lavender |
+| Xenon | ≈702 | 131.3 | 1× | pools | blue |
 
-| Token | What it is |
-|---|---|
-| `--aid-gas` | helium, neon, argon, krypton or xenon |
-| `--aid-pressure` | how much gas a container holds |
-| `--aid-agitation` | thermal motion and shimmer |
-| `--aid-refraction` | how strongly a disturbance bends light |
-| `--aid-weight`, `--aid-tilt` | how strongly the gas settles, and which way is down |
-| `--aid-light-reach`, `--aid-glow` | how far content light travels, and how much colour the gas keeps |
-| `--aid-excitation` | glow discharge |
+Xenon is the default: it scatters the most light, forms the heaviest layer and moves most calmly. Helium and neon scatter so little that they are close to invisible, which is true to nature and limits their use.
 
-## Two details that mattered
+## Depth without shadows
 
-**Depth.** When a floating button passed over another button, nothing happened. They looked like two stickers on one sheet. Now a container that sits above another fogs the one below: its wall, its gas and its label.
+Two containers at different heights must not look like two stickers on one sheet. In AID, a container that floats above another fogs the one below: its wall, its gas and its label. What is deeper is veiled. No drop shadow is involved.
 
 ![A floating button over another button](docs/img/05-depth.png)
 
-**The wall.** A container still needs a visible boundary, because the top of a settled container holds almost no gas. But a hard hairline looked like a glass edge. The wall is now a soft line, about two pixels wide and faint.
+## Principles
 
-## What is physics and what is not
+1. **State is physical.** One interface state maps to one quantity of the gas.
+2. **Content is the light.** The material has no colour of its own. It takes it from the page.
+3. **Calm at rest.** A container at rest never distorts what is behind it. Motion means something changed.
+4. **Honest physics.** Every behaviour in the specification is labelled *physical*, *approximation* or *artistic*.
 
-Every behaviour in the specification carries one of three labels: *physical*, *approximation* or *artistic*.
+The fourth principle matters to me. The direction and the ratios of settling are physical; the thickness of the layer is artistic, because a real heavy gas pools in a much deeper layer and mixes over time. The discharge colours are the published ones; using a discharge as a focus state is a design decision. A material that borrows from nature should say exactly where it stops borrowing.
 
-The direction and the ratios of settling are physical. The thickness of the layer is artistic: a real heavy gas does pool in air, but in a much deeper layer, and it mixes over time. The discharge colours are the published ones. Using a discharge as a focus state is my decision, not nature's.
+## How it relates to what exists
 
-I think a material that borrows from nature should say exactly where it stops borrowing.
+| | Material Design | Fluent | Liquid Glass | AID |
+|---|---|---|---|---|
+| Metaphor | paper and ink | acrylic and mica | glass | noble gas |
+| State of matter | solid | solid | solid | gas |
+| Content behind | hidden by opaque surfaces | blurred (acrylic) | reflected and refracted | veiled at rest, refracted only where disturbed |
+| Colour from context | from the theme, which on Android can follow the wallpaper | mica is "subtly tinted with the user's desktop background color" | informed by surrounding content | gathered as light from nearby content |
 
-## What I do not know yet
+AID is not the first interface to take colour from its surroundings or to react to the motion of the device. Liquid Glass does both. What I have not found elsewhere is the combination that defines AID: a gas as the material, interface state expressed as the state of that gas, weight that depends on the element, and refraction limited to disturbance.
 
-- I have not measured frame rate, heat or battery on real phones.
-- Helium and neon scatter so little light that they are close to invisible. That is accurate, and not very useful.
-- On a wide bar the settled layer reads clearly as gas. On a small button it may read as a plain gradient. That needs a test with real people.
-- I searched for earlier work and found smoke and fluid button effects, but not a design system built on these behaviours. My search was not exhaustive.
-- On ordinary HTML pages, the browser does not let WebGL read the page. Settling and excitation work there; content light and refraction need the content on a canvas.
+Two related ideas deserve credit. Döring, Sylvester and Schmidt described *ephemeral user interfaces* in 2013: physical interfaces made of fog, water, soap bubbles and other transient materials. And a recent essay sketched "Aqua Design", using the states of water as interface metaphors. AID differs in being an on-screen material with a physical model, a specification and running code.
+
+## What AID is not yet
+
+A design language is more than a material. Google's Material 3 Expressive was backed by 46 research studies with more than 18,000 participants. AID today is one person's proposal. To be explicit:
+
+- It has five components: scene, container, button, tabs and tab. No inputs, cards, sheets or dialogs yet.
+- It defines a material and a grammar. It does not yet define typography, colour, layout or iconography.
+- It has no user research. The central question is untested: do people see gas, and can they read through it?
+- Frame rate, heat and battery are unmeasured on real phones.
+- It runs on the web. Native ports to SwiftUI with Metal, Android with AGSL, and Flutter are possible but not built.
+- On ordinary HTML pages the browser does not let WebGL read the page, so content light and refraction need the content on a canvas.
+- My search for earlier work was careful but not exhaustive.
 
 ## Try it
 
-The code is MIT licensed and runs in the browser: WebGL2 and five Web Components.
+AID is open source under the MIT licence: WebGL2 and Web Components, with every parameter exposed as a CSS custom property.
+
+```html
+<aid-scene style="--aid-gas: xenon">
+  <aid-button>Approve</aid-button>
+  <aid-tabs>
+    <aid-tab selected>Home</aid-tab>
+    <aid-tab>Reports</aid-tab>
+  </aid-tabs>
+</aid-scene>
+```
 
 - Lab: [miladkm77.github.io/aid/lab.html](https://miladkm77.github.io/aid/lab.html)
 - Source and specification: [github.com/miladkm77/aid](https://github.com/miladkm77/aid)
 
-Switch the gas from xenon to helium, drag the tilt slider, and press a bar. If it still reads as glass to you, tell me where.
+Switch the gas from xenon to helium, drag the tilt slider, and press a bar. If it reads as glass to you, tell me where. If you want to build a component, a native port or a user study, I would like to hear from you.
+
+*Milad Karami Motlaq*
 
 ---
 
-Sources: discharge colours from LibreTexts, [Gas Discharge Tubes](https://chem.libretexts.org/Ancillary_Materials/Demos_Techniques_and_Experiments/Lecture_Demonstrations/Additional_Demos/Gas_Discharge_Tubes). Shadowgraph from Wikipedia, [Shadowgraph](https://en.wikipedia.org/wiki/Shadowgraph). The floating boat: Gizmodo, [Watch a model boat float on a sea of gas](https://gizmodo.com/watch-a-model-boat-float-on-a-sea-of-gas-5875071).
+### Sources
+
+- Apple, [Apple introduces a delightful and elegant new software design](https://www.apple.com/newsroom/2025/06/apple-introduces-a-delightful-and-elegant-new-software-design/) (2025).
+- Microsoft Learn, [Materials in Windows](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/materials).
+- Android Authority, [report on Material 3 Expressive and its research](https://www.androidauthority.com/google-material-3-expressive-details-3554486/) (2025).
+- T. Döring, A. Sylvester, A. Schmidt, [Ephemeral user interfaces](https://interactions.acm.org/archive/view/july-august-2013/ephemeral-user-interfaces), *ACM Interactions* (2013).
+- [Liquid Glass has reignited ideas that never quite disappeared](https://medium.com/design-bootcamp/liquid-glass-has-reignited-ideas-that-never-quite-disappeared-eca658d00853), Bootcamp.
+- LibreTexts, [Gas Discharge Tubes](https://chem.libretexts.org/Ancillary_Materials/Demos_Techniques_and_Experiments/Lecture_Demonstrations/Additional_Demos/Gas_Discharge_Tubes).
+- Wikipedia, [Shadowgraph](https://en.wikipedia.org/wiki/Shadowgraph).
+- Gizmodo, [Watch a model boat float on a sea of gas](https://gizmodo.com/watch-a-model-boat-float-on-a-sea-of-gas-5875071).
