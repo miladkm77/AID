@@ -11,6 +11,22 @@ export interface GasContainer {
   stateFactor(): number;
   /** an evacuated (disabled) container shows a dashed wall */
   dashed(): boolean;
+  /** the wall stays visible while the chamber is empty (an unchecked box, a switch track) */
+  shell?(): boolean;
+  /** working: the excitation pulses until it returns false */
+  busy?(): boolean;
+  /** fog everything below, not only the container it covers most (a dialog scrim) */
+  veilAll?(): boolean;
+}
+
+/** true if `inner` is `outer` or sits inside it, shadow trees included */
+function within(outer: Node, inner: Node): boolean {
+  let n: Node | null = inner;
+  while (n) {
+    if (n === outer) return true;
+    n = n.parentNode || (n instanceof ShadowRoot ? n.host : null);
+  }
+  return false;
 }
 
 export type View = 'final' | 'density' | 'light' | 'off';
@@ -40,6 +56,8 @@ interface Slot {
   rect: DOMRect | null;
   rad: number;
   veil: string;
+  /** ancestors that clip their content (scroll areas), cached between token refreshes */
+  clips: Element[];
   lastX: number;
   lastY: number;
   accX: number;
@@ -68,6 +86,12 @@ export class GasEngine {
   private uI = new Float32Array(MAX_CONTAINERS * 4);
   private uM = new Float32Array(MAX_CONTAINERS * 4);
   private uE = new Float32Array(MAX_CONTAINERS * 4);
+  private uK = new Float32Array(MAX_CONTAINERS * 4);
+  private uC = new Float32Array(MAX_CONTAINERS * 4);
+  private warned = false;
+  /** all container data, one row of six texels per container (see CONTAINERS in shaders.ts) */
+  private cdata = new Float32Array(MAX_CONTAINERS * 24);
+  private ctex: WebGLTexture;
   private grav = { x: 0, y: -1, k: 0 };
   private cssAngle = NaN;
   private cssFade = NaN;
@@ -104,7 +128,7 @@ export class GasEngine {
   private disposers: Array<() => void> = [];
   onStats: ((s: EngineStats) => void) | null = null;
 
-  constructor(private host: HTMLElement, private canvas: HTMLCanvasElement, transparent: boolean) {
+  constructor(private host: HTMLElement, private canvas: HTMLCanvasElement, transparent: boolean, private fixed = false) {
     const gl = canvas.getContext('webgl2', {
       alpha: transparent, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, powerPreference: 'low-power',
     });
@@ -114,13 +138,18 @@ export class GasEngine {
     this.P = { geo: this.g.program(GEO), gas: this.g.program(GAS), render: this.g.program(RENDER) };
     this.noise = this.g.noiseTexture();
     this.feedTex = gl.createTexture()!;
+    this.ctex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.ctex);
+    this.g.texParams(gl.NEAREST, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); // 32-bit float textures are not filterable everywhere
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 6, MAX_CONTAINERS, 0, gl.RGBA, gl.FLOAT, null);
     this.bindEvents();
   }
 
   /* ---------------- containers ---------------- */
   add(c: GasContainer): void {
     if (this.slots.has(c)) return;
-    const s: Slot = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, ev: 0, wv: CONTAINER_DEFAULTS.weight, z: 0, rect: null, rad: 0, veil: '', lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
+    const s: Slot = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, ev: 0, wv: CONTAINER_DEFAULTS.weight, z: 0, rect: null, rad: 0, veil: '', clips: [], lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
     this.slots.set(c, s);
     this.order.push(s);
     this.refreshParams(true);
@@ -159,8 +188,15 @@ export class GasEngine {
   get maxTextureSize(): number { return this.g.maxTexture; }
 
   /* ---------------- sizing ---------------- */
+  /** the box the canvas covers: the scene element, or the viewport for a fixed scene */
+  private frame(): { left: number; top: number; right: number; bottom: number; width: number; height: number } {
+    if (!this.fixed) return this.host.getBoundingClientRect();
+    const w = document.documentElement.clientWidth || window.innerWidth, h = window.innerHeight;
+    return { left: 0, top: 0, right: w, bottom: h, width: w, height: h };
+  }
+
   resize(): void {
-    const r = this.host.getBoundingClientRect();
+    const r = this.frame();
     this.W = Math.max(1, r.width);
     this.H = Math.max(1, r.height);
     this.refreshParams(true);
@@ -195,6 +231,12 @@ export class GasEngine {
       const cs = getComputedStyle(s.c.el);
       s.params = readContainerParams(s.c.el);
       s.z = parseInt(cs.zIndex, 10) || 0;
+      s.clips = [];
+      let a: Node | null = s.c.el.parentNode || ((s.c.el.getRootNode() as ShadowRoot).host ?? null);
+      while (a && a !== this.host) {
+        if (a instanceof Element) { const o = getComputedStyle(a); if (o.overflowX !== 'visible' || o.overflowY !== 'visible') s.clips.push(a); }
+        a = a.parentNode || (a instanceof ShadowRoot ? a.host : null);
+      }
     }
     const t = chooseTier(this.scene.quality);
     if (t !== this.tier) {
@@ -205,7 +247,7 @@ export class GasEngine {
 
   /* ---------------- geometry ---------------- */
   private collect(dt: number): boolean {
-    const hr = this.host.getBoundingClientRect();
+    const hr = this.frame();
     const df = densityFactor(this.scene.temperature);
     let moving = false;
     // gravity: heavy gases settle along it, light gases against it
@@ -227,19 +269,28 @@ export class GasEngine {
     this.n = 0;
     for (const s of this.order) {
       s.rect = null;
-      if (this.n >= MAX_CONTAINERS) break;
+      if (this.n >= MAX_CONTAINERS) {
+        if (!this.warned) { this.warned = true; console.warn(`AID: more than ${MAX_CONTAINERS} gas containers are visible at once; the rest are drawn without gas.`); }
+        break;
+      }
       const target = s.c.stateFactor() * s.params.pressure;
       const k = target > s.pv ? (s.c.stateFactor() > 1 ? 14 : 4) : 2.5; // compress fast, release slowly
       s.pv += (target - s.pv) * (dt > 0 ? 1 - Math.exp(-dt * k) : 1);
       if (Math.abs(target - s.pv) > 0.003) moving = true;
-      const et = s.c.dashed() ? 0 : s.params.excitation;
+      let et = s.c.dashed() ? 0 : s.params.excitation;
+      if (et < 1 && s.c.busy?.()) { et = Math.max(et, 0.25 + 0.3 * (0.5 + 0.5 * Math.sin(performance.now() / 1000 * 5))); moving = true; }
       s.ev += (et - s.ev) * (dt > 0 ? 1 - Math.exp(-dt * 7) : 1);
       if (Math.abs(et - s.ev) > 0.003) moving = true;
       s.wv += (s.params.weight - s.wv) * e;
       if (Math.abs(s.params.weight - s.wv) > 0.003) moving = true;
       const r = s.c.el.getBoundingClientRect();
-      if (r.width < 1 || r.bottom < hr.top || r.top > hr.bottom || r.right < hr.left || r.left > hr.right) continue;
-      const empty = s.pv < 0.004 && !s.c.dashed();
+      if (r.width < 1) continue;
+      // what is visible of it: the frame, cut by every scrolling ancestor
+      let k0 = hr.left, k1 = hr.right, k2 = hr.top, k3 = hr.bottom;
+      for (const a of s.clips) { const q = a.getBoundingClientRect(); k0 = Math.max(k0, q.left); k1 = Math.min(k1, q.right); k2 = Math.max(k2, q.top); k3 = Math.min(k3, q.bottom); }
+      if (r.bottom <= k2 || r.top >= k3 || r.right <= k0 || r.left >= k1) continue;
+      const shell = s.c.shell?.() ?? false;
+      const empty = s.pv < 0.004 && !s.c.dashed() && !shell;
       if (empty) continue;
       const j = this.n * 4;
       const x0 = (r.left - hr.left) / this.W, x1 = (r.right - hr.left) / this.W;
@@ -252,7 +303,10 @@ export class GasEngine {
       this.uI[j + 2] = rad;
       this.uE[j] = s.ev * Math.min(1, s.pv);
       this.uE[j + 1] = s.wv;
-      this.uI[j + 3] = (s.c.dashed() ? -1 : 1) * s.params.membrane * Math.min(1, s.c.dashed() ? 1 : s.pv * 1.5);
+      this.uI[j + 3] = (s.c.dashed() ? -1 : 1) * s.params.membrane * (s.c.dashed() || shell ? 1 : Math.min(1, s.pv * 1.5));
+      this.uK[j] = (k0 - hr.left) / this.W; this.uK[j + 1] = 1 - (k3 - hr.top) / this.H; this.uK[j + 2] = (k1 - hr.left) / this.W; this.uK[j + 3] = 1 - (k2 - hr.top) / this.H;
+      const col = s.params.excitationColor || GASES[this.scene.gas].emission;
+      this.uC[j] = col[0] / 255; this.uC[j + 1] = col[1] / 255; this.uC[j + 2] = col[2] / 255;
       const mx = isNaN(s.lastX) ? 0 : x0 - s.lastX, my = isNaN(s.lastY) ? 0 : y0 - s.lastY;
       s.accX += mx; s.accY += my;
       this.uM[j] = s.accX; this.uM[j + 1] = s.accY;
@@ -277,7 +331,7 @@ export class GasEngine {
         let x0 = 0, y0 = 0, x1 = 0, y1 = 0, rad = 0, best = 0;
         for (const lo of this.order) {
           const b = lo.rect;
-          if (!b || lo === up || lo.z > up.z || up.c.el.contains(lo.c.el) || lo.c.el.contains(up.c.el)) continue;
+          if (!b || lo === up || lo.z > up.z || within(up.c.el, lo.c.el) || within(lo.c.el, up.c.el)) continue;
           // equal z-index: the later element in the document paints on top, as in CSS
           if (lo.z === up.z && !(lo.c.el.compareDocumentPosition(up.c.el) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
           const w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
@@ -286,7 +340,8 @@ export class GasEngine {
           // so its rounded shape shows through the upper gas
           best = w * h; x0 = b.left; y0 = b.top; x1 = b.right; y1 = b.bottom; rad = lo.rad;
         }
-        if (x1 > x0) {
+        if (up.c.veilAll?.()) veil = 'none';
+        else if (x1 > x0) {
           const o = 1.5, f = (v: number) => Math.round(v * 2) / 2; // the veil layer is inset by 1.5px to keep the upper wall crisp
           veil = `inset(${f(y0 - a.top - o)}px ${f(a.right - x1 - o)}px ${f(a.bottom - y1 - o)}px ${f(x0 - a.left - o)}px round ${Math.round(rad)}px)`;
         }
@@ -302,10 +357,16 @@ export class GasEngine {
 
   private setContainers(p: Program): void {
     const gl = this.gl, u = p.u;
-    if (u.uR) gl.uniform4fv(u.uR, this.uR);
-    if (u.uI) gl.uniform4fv(u.uI, this.uI);
-    if (u.uM) gl.uniform4fv(u.uM, this.uM);
-    if (u.uE) gl.uniform4fv(u.uE, this.uE);
+    if (u.uCt) {
+      const d = this.cdata;
+      for (let i = 0; i < this.n; i++) {
+        const j = i * 4, o = i * 24;
+        d.set(this.uR.subarray(j, j + 4), o); d.set(this.uI.subarray(j, j + 4), o + 4); d.set(this.uE.subarray(j, j + 4), o + 8);
+        d.set(this.uK.subarray(j, j + 4), o + 12); d.set(this.uC.subarray(j, j + 4), o + 16); d.set(this.uM.subarray(j, j + 4), o + 20);
+      }
+      gl.uniform1i(u.uCt, this.g.bind(5, this.ctex));
+      if (this.n) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 6, this.n, gl.RGBA, gl.FLOAT, d.subarray(0, this.n * 24));
+    }
     if (u.uGv) gl.uniform3f(u.uGv, this.grav.x, this.grav.y, this.grav.k);
     if (u.uN) gl.uniform1i(u.uN, this.n);
     if (u.uPx) gl.uniform2f(u.uPx, this.W, this.H);
@@ -350,6 +411,7 @@ export class GasEngine {
   }
 
   render(): void {
+    if (this.geo) { this.use(this.P.geo); this.g.draw(this.geo); }   // the coarse mask the render pass culls with
     if (!this.st) return;
     const gl = this.gl, g = this.g, P = this.P.render, u = P.u, sc = this.scene, gas = GASES[sc.gas];
     this.use(P);
@@ -365,7 +427,6 @@ export class GasEngine {
     gl.uniform1f(u.fdpr, this.feedDpr);
     gl.uniform1f(u.agit, sc.temperature);
     gl.uniform1f(u.glow, sc.glow);
-    gl.uniform3f(u.emis, gas.emission[0] / 255, gas.emission[1] / 255, gas.emission[2] / 255);
     gl.uniform1f(u.smoke, sc.smoke);
     gl.uniform1f(u.reach, sc.lightReach);
     gl.uniform1f(u.flowT, this.flowT);
@@ -469,7 +530,8 @@ export class GasEngine {
   private bindEvents(): void {
     const host = this.host, p = this.ptr;
     const track = (e: PointerEvent, down?: boolean) => {
-      const r = host.getBoundingClientRect();
+      if (this.W < 2 || this.H < 2) return;   // a pointer event can arrive before the first layout
+      const r = this.frame();
       const now = performance.now() / 1000;
       if (p.lt) { const d = Math.max(now - p.lt, 1 / 240); p.vx = 0.6 * p.vx + 0.4 * ((e.clientX - p.lx) / d); p.vy = 0.6 * p.vy + 0.4 * ((e.clientY - p.ly) / d); }
       p.lx = e.clientX; p.ly = e.clientY; p.lt = now;
@@ -487,6 +549,9 @@ export class GasEngine {
     on('pointerup', (e) => track(e, false), true);
     on('pointercancel', () => { p.down = false; p.over = false; this.wake(); }, true);
     on('pointerleave', () => { p.down = false; p.over = false; p.lt = 0; this.wake(); });
+    const scrolled = () => this.wake();   // any scroll moves containers against the canvas
+    window.addEventListener('scroll', scrolled, { capture: true, passive: true });
+    this.disposers.push(() => window.removeEventListener('scroll', scrolled, { capture: true }));
     const vis = () => { this.visible = !document.hidden; if (this.visible) this.wake(); };
     document.addEventListener('visibilitychange', vis);
     this.disposers.push(() => document.removeEventListener('visibilitychange', vis));

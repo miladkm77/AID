@@ -11,7 +11,7 @@
  *   - gas heavier than air pools along gravity, lighter gas rises,
  *   - an excited container emits the discharge colour of its gas.
  */
-export const MAX_CONTAINERS = 16;
+export const MAX_CONTAINERS = 96;
 
 export const VERTEX = `#version 300 es
 in vec2 aPos;uniform vec2 texel;out vec2 vUv,vL,vR,vT,vB;
@@ -22,27 +22,40 @@ precision highp float;precision highp sampler2D;
 in vec2 vUv,vL,vR,vT,vB;out vec4 o;
 `;
 
-/* Containers: uR = rect in uv (x0,y0,x1,y1); uI = (target density, edge softness, corner radius px, membrane alpha; negative = dashed);
-   uE = (excitation, weight, -, -). uGv = (direction the gas settles toward, in uv space with y up; 1 / scale height in px at weight 1). */
+/* Container data lives in a small float texture, one row per container, so the count is not bound by the uniform
+   limit of the device. Columns: 0 rect in uv (x0,y0,x1,y1) · 1 (target density, edge softness, corner radius px,
+   membrane alpha; negative = dashed) · 2 (excitation, weight, -, -) · 3 rect it is clipped to by scrolling ancestors ·
+   4 colour of the excited gas · 5 motion since the last step (uv).
+   uGv = (direction the gas settles toward, in uv space with y up; 1 / scale height in px at weight 1). */
 const CONTAINERS = `
-uniform vec4 uR[${MAX_CONTAINERS}];uniform vec4 uI[${MAX_CONTAINERS}];uniform vec4 uE[${MAX_CONTAINERS}];uniform int uN;uniform vec2 uPx;uniform vec3 uGv;
+uniform sampler2D uCt;uniform int uN;uniform vec2 uPx;uniform vec3 uGv;
+#define CD(i,c) texelFetch(uCt,ivec2(c,i),0)
 float sdRR(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+r;return length(max(q,0.))+min(max(q.x,q.y),0.)-r;}
-float elD(int i,vec2 uv){vec4 R=uR[i];vec2 lo=R.xy*uPx,hi=R.zw*uPx,hb=(hi-lo)*.5;return sdRR(uv*uPx-(lo+hi)*.5,hb,min(uI[i].z,min(hb.x,hb.y)));}
-float elT(int i,float d){vec2 hb=(uR[i].zw-uR[i].xy)*uPx*.5;float w=max(min(hb.x,hb.y)*uI[i].y,1.5);float x=clamp(-d/w,0.,1.);return x*x*(3.-2.*x);}
+/* far from the container's box by more than m px: skipped before any distance is computed */
+bool elFar(vec4 R,vec2 uv,float m){vec2 q=vec2(m)/uPx;return uv.x<R.x-q.x||uv.x>R.z+q.x||uv.y<R.y-q.y||uv.y>R.w+q.y;}
+float elD0(vec4 R,vec4 I,vec2 uv){vec2 lo=R.xy*uPx,hi=R.zw*uPx,hb=(hi-lo)*.5;return sdRR(uv*uPx-(lo+hi)*.5,hb,min(I.z,min(hb.x,hb.y)));}
+float elC(vec4 K,vec2 uv){vec2 p=uv*uPx,lo=K.xy*uPx,hi=K.zw*uPx;return max(max(lo.x-p.x,p.x-hi.x),max(lo.y-p.y,p.y-hi.y));}
+float elT(vec4 R,vec4 I,float d){vec2 hb=(R.zw-R.xy)*uPx*.5;float w=max(min(hb.x,hb.y)*I.y,1.5);float x=clamp(-d/w,0.,1.);return x*x*(3.-2.*x);}
 /* settling: density profile of a gas that is heavier (or lighter) than the air it shares the container with */
-float elS(int i,vec2 uv){
- vec4 R=uR[i];vec2 c=(R.xy+R.zw)*.5*uPx,hb=(R.zw-R.xy)*uPx*.5;
+float elS(vec4 R,vec4 E,vec2 uv){
+ vec2 c=(R.xy+R.zw)*.5*uPx,hb=(R.zw-R.xy)*uPx*.5;
  float L=2.*(abs(uGv.x)*hb.x+abs(uGv.y)*hb.y);
- float h=clamp(L*.5-dot(uv*uPx-c,uGv.xy),0.,L),k=uGv.z*uE[i].y;
+ float h=clamp(L*.5-dot(uv*uPx-c,uGv.xy),0.,L),k=uGv.z*E.y;
  return exp(-h*k)*(1.+.5*min(L*k,2.));}
 `;
 
-/** x = inside mask, y = target density, zw = container motion since last step (uv) */
+/**
+ * x = inside mask, y = target density, zw = container motion since last step (uv).
+ * y is −1 where no container is within about a cell and a half; the render pass uses that to skip the
+ * per-container loop for most of the screen.
+ */
 export const GEO = HEAD + CONTAINERS + `
-uniform vec4 uM[${MAX_CONTAINERS}];
-void main(){float m=0.,g=0.;vec2 mv=vec2(0.);
- for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;float k=1.-smoothstep(-1.,1.,elD(i,vUv));if(k>m)mv=uM[i].xy;m=max(m,k);g+=k*uI[i].x*elS(i,vUv);}
- o=vec4(m,g,mv);}`;
+uniform vec2 texel;
+void main(){float m=0.,g=0.;bool near=false;vec2 mv=vec2(0.);float cell=uPx.x*texel.x,reachPx=1.6*cell+2.;
+ for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;vec4 R=CD(i,0);if(elFar(R,vUv,reachPx))continue;
+  vec4 I=CD(i,1);float d=max(elD0(R,I,vUv),elC(CD(i,3),vUv));if(d<reachPx)near=true;
+  float k=1.-smoothstep(-1.,1.,d);if(k<=0.)continue;if(k>m)mv=CD(i,5).xy;m=max(m,k);g+=k*I.x*elS(R,CD(i,2),vUv);}
+ o=vec4(m,near?g:-1.,mv);}`;
 
 /**
  * Compressible isothermal gas, heavily damped (no oscillation): p = c²ρ, continuity, weight, a finger force, thermal stirring.
@@ -82,10 +95,10 @@ void main(){
 export const RENDER = HEAD + CONTAINERS + `
 uniform sampler2D uFeed,uS,uNz,uGt;
 uniform float scr,vf,amp,dn,sig,smoke,reach,flowT,smix,hasSim,hasFeed,alb,agit,glow,fdpr;
-uniform vec3 scene,tw,emis;uniform vec4 mem,uPtr;uniform int mode,taps;
+uniform vec3 scene,tw;uniform vec4 mem,uPtr;uniform int mode,taps;
 vec2 fuv(vec2 s){float fy=scr+(1.-s.y)*vf;return vec2(clamp(s.x,0.,1.),1.-clamp(fy,0.,1.));}
 vec3 feed(vec2 s){return texture(uFeed,fuv(s)).rgb;}
-float fbm(vec2 p){return texture(uNz,p).x*.55+texture(uNz,p*1.97+.37).x*.3+texture(uNz,p*3.9+.71).x*.15;}
+float fbm(vec2 p){return texture(uNz,p).x*.62+texture(uNz,p*1.97+.37).x*.3+texture(uNz,p*3.9+.71).x*.08;}
 float luma(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
 /* The simulation supplies how far the gas is from its settled state, as the ratio ρ/ρ_eq (1 at rest). The settled
    profile itself is evaluated per pixel from the container shapes, so its edges stay sharp at any grid size. */
@@ -93,12 +106,14 @@ float ratio(vec2 uv){
  if(hasSim>0.){vec4 G=texture(uGt,uv);return G.x>.02?clamp(texture(uS,uv).x/max(G.y,.03),0.,4.):1.;}
  vec2 d=(uv-uPtr.xy)*uPx;return 1.-min(uPtr.z/600.,.7)*exp(-dot(d,d)/(uPtr.w*uPtr.w));}
 void main(){
- bool near=false;float memv=0.,th=0.,ex=0.,wall=1e4,tg=0.;
- for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;float d=elD(i,vUv);if(d<1.)near=true;float a=abs(uI[i].w);
-  wall=min(wall,abs(d));if(d<1.)tg+=(1.-smoothstep(-1.,1.,d))*uI[i].x*elS(i,vUv);if(d<=0.){th=max(th,elT(i,d));ex=max(ex,uE[i].x);}
-  if(a>0.){float ring=1.-smoothstep(0.,1.9,abs(d+.9));   /* a soft wall, not a hairline */
-   if(uI[i].w<0.)ring*=step(.5,fract((vUv.x*uPx.x+vUv.y*uPx.y)/7.));memv=max(memv,ring*a);}}
- if(!near||mode==3){if(hasFeed>0.)o=vec4((mode==0||mode==3)?feed(vUv):vec3(.04),1.);else o=vec4(0.);return;}
+ bool near=false;float memv=0.,th=0.,ex=0.,wall=1e4,tg=0.;vec3 emis=vec3(0.);
+ if(mode!=3&&texture(uGt,vUv).y>-.999)                            /* the coarse mask says a container is close */
+ for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;vec4 R=CD(i,0);if(elFar(R,vUv,16.))continue;
+  vec4 I=CD(i,1),E=CD(i,2);float d0=elD0(R,I,vUv),dc=elC(CD(i,3),vUv),d=max(d0,dc);if(d<1.)near=true;float a=abs(I.w);
+  wall=min(wall,abs(d));if(d<1.)tg+=(1.-smoothstep(-1.,1.,d))*I.x*elS(R,E,vUv);if(d<=0.){th=max(th,elT(R,I,d));if(E.x>ex){ex=E.x;emis=CD(i,4).rgb;}}
+  if(a>0.&&dc<0.){float ring=1.-smoothstep(0.,1.9,abs(d0+.9));   /* a soft wall, not a hairline; none along a clip edge */
+   if(I.w<0.)ring*=step(.5,fract((vUv.x*uPx.x+vUv.y*uPx.y)/7.));memv=max(memv,ring*a);}}
+ if(!near){if(hasFeed>0.)o=vec4((mode==0||mode==3)?feed(vUv):vec3(.04),1.);else o=vec4(0.);return;}
  float s0=ratio(vUv),rho=tg*s0;
  /* only the disturbance (density minus the settled profile) refracts: it is zero at rest, so a wall never acts as a lens */
  float dl=tg*(ratio(vL)-1.),dr=tg*(ratio(vR)-1.),dT=tg*(ratio(vT)-1.),dB=tg*(ratio(vB)-1.),d0=tg*(s0-1.);

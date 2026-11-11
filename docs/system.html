@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AID Design System</title>
+<meta name="description" content="AID design system: foundations, icons and every component in every state.">
+<meta name="theme-color" content="#EEF0F3">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Vazirmatn:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+*{box-sizing:border-box}
+html{background:var(--aid-color-bg);color:var(--aid-color-ink);-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--aid-font);font-size:var(--aid-text-md);line-height:1.6;background:var(--aid-color-bg);color:var(--aid-color-ink)}
+[dir=rtl] body{line-height:1.85}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em}
+.wrap{max-width:1080px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-left,0px)) 80px max(16px,env(safe-area-inset-right,0px))}
+header.top{padding:28px 0 8px}
+.eyebrow{font:600 12px "JetBrains Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--aid-color-ink-muted)}
+h1{font-size:clamp(30px,6vw,52px);line-height:1.05;letter-spacing:-.03em;margin:6px 0 10px;font-weight:800}
+[dir=rtl] h1{letter-spacing:0;line-height:1.3}
+.lead{color:var(--aid-color-ink-muted);max-width:62ch;margin:0}
+.bar{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 0;margin-top:14px;background:color-mix(in srgb,var(--aid-color-bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--aid-color-line)}
+.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--aid-color-line);border-radius:10px;background:var(--aid-color-surface)}
+.seg button{font:inherit;font-size:13px;color:var(--aid-color-ink-muted);background:none;border:0;border-radius:8px;padding:5px 10px;min-height:32px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--aid-color-ink);color:var(--aid-color-bg)}
+.seg button:focus-visible{outline:2px solid var(--aid-color-ink);outline-offset:2px}
+.seglabel{font-size:12px;color:var(--aid-color-ink-muted)}
+@media (max-width:700px){.bar{position:static;background:none;backdrop-filter:none;-webkit-backdrop-filter:none}}
+#stats{font:12px "JetBrains Mono",monospace;color:var(--aid-color-ink-muted);margin-inline-start:auto}
+section.sec{padding:44px 0 8px;border-bottom:1px solid var(--aid-color-line)}
+section.sec:last-of-type{border-bottom:0}
+h2{font-size:var(--aid-text-xl);letter-spacing:-.02em;margin:0 0 4px}
+[dir=rtl] h2{letter-spacing:0}
+h3{font-size:var(--aid-text-sm);margin:26px 0 10px;color:var(--aid-color-ink-muted);font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+[dir=rtl] h3{letter-spacing:0}
+.note{color:var(--aid-color-ink-muted);margin:0 0 6px;max-width:70ch;font-size:var(--aid-text-sm)}
+.scroll{overflow-x:auto;padding:6px 2px 14px;margin:0 -2px}
+table.t{border-collapse:collapse;width:100%;font-size:var(--aid-text-sm)}
+.t th,.t td{text-align:start;padding:9px 12px 9px 0;border-bottom:1px solid var(--aid-color-line);vertical-align:top}
+[dir=rtl] .t th,[dir=rtl] .t td{padding:9px 0 9px 12px}
+.t th{color:var(--aid-color-ink-muted);font-weight:600;white-space:nowrap}
+.matrix{display:grid;gap:14px 12px;align-items:center;min-width:max-content}
+.matrix .h{font-size:12px;color:var(--aid-color-ink-muted);font-weight:600}
+.matrix .r{font-size:13px;color:var(--aid-color-ink-muted);padding-inline-end:6px}
+.row{display:flex;flex-wrap:wrap;gap:14px 18px;align-items:center}
+.stack{display:grid;gap:6px;justify-items:start}
+.cap{font-size:12px;color:var(--aid-color-ink-muted)}
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.chipc{border:1px solid var(--aid-color-line);border-radius:14px;overflow:hidden;background:var(--aid-color-surface)}
+.chipc i{display:block;height:54px}
+.chipc div{padding:8px 10px;font-size:12px}
+.chipc b{display:block;font-size:13px}
+.type>div{display:flex;gap:16px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--aid-color-line)}
+.type .mono{flex:none;width:150px;color:var(--aid-color-ink-muted);font-size:12px}
+.meter{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.meter div{display:grid;gap:6px;justify-items:center;font-size:12px;color:var(--aid-color-ink-muted)}
+.meter i{display:block;background:var(--aid-color-ink);opacity:.8}
+.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.icons div{display:grid;gap:6px;justify-items:center;padding:14px 4px 10px;border:1px solid var(--aid-color-line);border-radius:12px;background:var(--aid-color-surface);font-size:11px;color:var(--aid-color-ink-muted)}
+.icons aid-icon{width:24px;height:24px;color:var(--aid-color-ink)}
+label.opt{display:inline-flex;gap:10px;align-items:center;cursor:pointer;font-size:var(--aid-text-sm)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.fgrid label{display:grid;gap:6px;font-size:13px;color:var(--aid-color-ink-muted)}
+.fgrid .hint{font-size:12px}
+.fgrid .err{color:rgb(var(--aid-danger))}
+aid-field aid-icon{color:var(--aid-color-ink-muted)}
+::placeholder{color:var(--aid-color-ink-muted);opacity:.8}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+aid-card h4{margin:0 0 4px;font-size:var(--aid-text-md)}
+aid-card p{margin:0 0 34px;color:var(--aid-color-ink-muted);font-size:var(--aid-text-sm)}
+aid-tabs{width:min(100%,380px);height:60px;font-size:13px;font-weight:600;color:var(--aid-color-ink-muted);--aid-weight:.25}
+aid-tabs aid-tab[selected]{color:var(--aid-color-ink)}
+aid-dialog h4{margin:0 0 6px;font-size:var(--aid-text-lg)}
+aid-dialog p{margin:0 0 18px;color:var(--aid-color-ink-muted);font-size:var(--aid-text-sm)}
+aid-dialog .row{justify-content:flex-end}
+pre{font:12.5px/1.7 "JetBrains Mono",monospace;background:var(--aid-color-surface);border:1px solid var(--aid-color-line);border-radius:14px;padding:16px;overflow:auto;margin:10px 0;direction:ltr;text-align:left}
+footer{padding:28px 0;color:var(--aid-color-ink-muted);font-size:var(--aid-text-sm)}
+a{color:inherit}
+</style>
+</head>
+<body>
+<aid-scene id="scene" fixed>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Atmospheric Interface Design · 0.3</div>
+    <h1 data-fa="دیزاین سیستم AID">AID Design System</h1>
+    <p class="lead" data-fa="پایه‌ها، آیکون‌ها و همه‌ی کامپوننت‌ها در همه‌ی حالت‌ها. هر کنترل یک محفظه‌ی گاز است و حالت رابط، حالت همان گاز است.">Foundations, icons and every component in every state. Each control is a container of gas, and the state of the interface is the state of that gas.</p>
+  </header>
+
+  <div class="bar" role="toolbar" aria-label="Page settings">
+    <span class="seglabel">Theme</span>
+    <span class="seg" id="segTheme"><button data-v="auto" aria-pressed="true">Auto</button><button data-v="light" aria-pressed="false">Light</button><button data-v="dark" aria-pressed="false">Dark</button></span>
+    <span class="seglabel">Direction</span>
+    <span class="seg" id="segDir"><button data-v="ltr" aria-pressed="true">LTR</button><button data-v="rtl" aria-pressed="false">RTL فارسی</button></span>
+    <span class="seglabel">Gas</span>
+    <span class="seg" id="segGas"><button data-v="helium" aria-pressed="false">He</button><button data-v="neon" aria-pressed="false">Ne</button><button data-v="argon" aria-pressed="false">Ar</button><button data-v="krypton" aria-pressed="false">Kr</button><button data-v="xenon" aria-pressed="true">Xe</button></span>
+    <span id="stats" aria-live="off"></span>
+  </div>
+
+  <section class="sec" id="grammar">
+    <h2 data-fa="دستور زبان">Grammar</h2>
+    <p class="note" data-fa="هر حالت رابط به یک کمیت فیزیکی گاز نگاشت می‌شود. هیچ حرکتی تزئینی نیست.">Every interface state maps to one physical quantity of the gas. Nothing moves for decoration.</p>
+    <div class="scroll"><table class="t">
+      <tr><th>State</th><th>Quantity</th><th>What changes</th><th>How to set it</th></tr>
+      <tr><td>Rest</td><td>Pressure</td><td>The container holds its set amount of gas</td><td><code>--aid-pressure</code></td></tr>
+      <tr><td>Hover</td><td>Pressure ×1.1</td><td>The gas gathers under the pointer</td><td>automatic</td></tr>
+      <tr><td>Pressed / active</td><td>Compression ×1.25</td><td>Gas thins under the finger, piles up around it</td><td>automatic</td></tr>
+      <tr><td>Focus</td><td>Excitation</td><td>The gas glows in the colour of its element; an outline is kept</td><td>automatic, <code>--aid-excitation</code></td></tr>
+      <tr><td>Selected / checked / on</td><td>A filled chamber</td><td>The chamber fills; an icon confirms it without colour</td><td><code>selected</code>, <code>checked</code></td></tr>
+      <tr><td>Loading</td><td>Pulsing excitation</td><td>The glow rises and falls</td><td><code>loading</code></td></tr>
+      <tr><td>Invalid</td><td>Excitation, danger colour</td><td>The gas glows red; a message explains why</td><td><code>invalid</code>, <code>aria-invalid</code></td></tr>
+      <tr><td>Disabled</td><td>Vacuum</td><td>The container is evacuated, its wall is dashed</td><td><code>disabled</code></td></tr>
+      <tr><td>Elevation</td><td>Fogging</td><td>What is below is veiled; a dialog fogs the whole scene</td><td><code>z-index</code>, <code>&lt;aid-dialog&gt;</code></td></tr>
+    </table></div>
+  </section>
+
+  <section class="sec" id="colour">
+    <h2 data-fa="رنگ">Colour</h2>
+    <p class="note" data-fa="ماده رنگی از خودش ندارد و رنگش را از محتوا می‌گیرد. توکن‌های رنگ برای صفحه، متن و حالت‌های معنایی‌اند.">The material has no colour of its own; it takes it from the content. Colour tokens are for the page, the text and semantic states.</p>
+    <h3>Neutrals</h3>
+    <div class="sw" id="swN"></div>
+    <h3>Semantic, as excited gas</h3>
+    <div class="row">
+      <div class="stack"><aid-gas style="width:120px;height:52px;border-radius:16px;--aid-excitation:.85;--aid-pressure:1.3"></aid-gas><span class="cap">accent · the gas</span></div>
+      <div class="stack"><aid-gas style="width:120px;height:52px;border-radius:16px;--aid-excitation:.85;--aid-pressure:1.3;--aid-excitation-color:var(--aid-info)"></aid-gas><span class="cap mono">--aid-info</span></div>
+      <div class="stack"><aid-gas style="width:120px;height:52px;border-radius:16px;--aid-excitation:.85;--aid-pressure:1.3;--aid-excitation-color:var(--aid-success)"></aid-gas><span class="cap mono">--aid-success</span></div>
+      <div class="stack"><aid-gas style="width:120px;height:52px;border-radius:16px;--aid-excitation:.85;--aid-pressure:1.3;--aid-excitation-color:var(--aid-warning)"></aid-gas><span class="cap mono">--aid-warning</span></div>
+      <div class="stack"><aid-gas style="width:120px;height:52px;border-radius:16px;--aid-excitation:.85;--aid-pressure:1.3;--aid-excitation-color:var(--aid-danger)"></aid-gas><span class="cap mono">--aid-danger</span></div>
+    </div>
+    <h3>Accent by gas</h3>
+    <div class="sw" id="swG"></div>
+  </section>
+
+  <section class="sec" id="type">
+    <h2 data-fa="تایپوگرافی">Typography</h2>
+    <p class="note">Inter for Latin, Vazirmatn for Persian, one scale for both. Labels are real text above the gas and are never refracted.</p>
+    <div class="type" id="typeScale"></div>
+  </section>
+
+  <section class="sec" id="space">
+    <h2 data-fa="فاصله، گردی و اندازه">Space, radius and size</h2>
+    <h3>Space</h3><div class="meter" id="mSpace"></div>
+    <h3>Radius</h3><div class="meter" id="mRadius"></div>
+    <h3>Control height</h3><div class="meter" id="mSize"></div>
+  </section>
+
+  <section class="sec" id="icons">
+    <h2 data-fa="آیکون‌ها">Icons</h2>
+    <p class="note">24 px grid, 1.75 px stroke, round caps, drawn in the text colour. Arrows and chevrons mirror in right-to-left.</p>
+    <div class="icons" id="iconGrid"></div>
+  </section>
+
+  <section class="sec" id="button">
+    <h2 data-fa="دکمه">Button</h2>
+    <p class="note"><code>&lt;aid-button&gt;</code> · four variants, six states.</p>
+    <div class="scroll"><div class="matrix" id="mxButton" style="grid-template-columns:90px repeat(6,max-content)"></div></div>
+    <h3>Sizes and icons</h3>
+    <div class="row">
+      <aid-button size="sm" data-fa="کوچک">Small</aid-button>
+      <aid-button data-fa="متوسط">Medium</aid-button>
+      <aid-button size="lg" data-fa="بزرگ">Large</aid-button>
+      <aid-button variant="primary"><aid-icon name="plus"></aid-icon><span data-fa="پرونده‌ی جدید">New case</span></aid-button>
+      <aid-button><span data-fa="ادامه">Continue</span><aid-icon name="arrow-right"></aid-icon></aid-button>
+      <aid-button icon aria-label="Search"><aid-icon name="search"></aid-icon></aid-button>
+      <aid-button icon size="sm" variant="quiet" aria-label="More"><aid-icon name="more"></aid-icon></aid-button>
+    </div>
+  </section>
+
+  <section class="sec" id="chip">
+    <h2 data-fa="چیپ">Chip</h2>
+    <p class="note"><code>&lt;aid-chip&gt;</code> · a toggle for filters. Unselected it is an almost empty shell; selected it fills.</p>
+    <div class="scroll"><div class="matrix" id="mxChip" style="grid-template-columns:repeat(6,max-content)"></div></div>
+  </section>
+
+  <section class="sec" id="field">
+    <h2 data-fa="فیلد ورودی">Field</h2>
+    <p class="note"><code>&lt;aid-field&gt;</code> wraps a native input, textarea or select, which keeps its own semantics and validation.</p>
+    <div class="fgrid">
+      <label><span>Rest</span><aid-field><input placeholder="Case number" data-fa-ph="شماره‌ی پرونده"></aid-field></label>
+      <label><span>Hover</span><aid-field force="hover"><input placeholder="Case number" data-fa-ph="شماره‌ی پرونده"></aid-field></label>
+      <label><span>Focus</span><aid-field force="focus"><input value="1248"></aid-field></label>
+      <label><span>With icon</span><aid-field><aid-icon name="search"></aid-icon><input placeholder="Search" data-fa-ph="جست‌وجو"></aid-field></label>
+      <label><span>Invalid</span><aid-field invalid><input value="12" aria-invalid="true" aria-describedby="e1"></aid-field><span class="hint err" id="e1">Enter at least 4 digits.</span></label>
+      <label><span>Disabled</span><aid-field><input value="Locked" disabled></aid-field></label>
+      <label><span>Select</span><aid-field><select><option>Central Hospital</option><option>Northern Hospital</option></select><aid-icon name="chevron-down"></aid-icon></aid-field></label>
+      <label><span>Textarea</span><aid-field><textarea placeholder="Reason" data-fa-ph="دلیل"></textarea></aid-field></label>
+    </div>
+  </section>
+
+  <section class="sec" id="select">
+    <h2 data-fa="کنترل‌های انتخاب">Selection controls</h2>
+    <h3>Checkbox</h3>
+    <div class="row">
+      <label class="opt"><aid-checkbox></aid-checkbox> Unchecked</label>
+      <label class="opt"><aid-checkbox checked></aid-checkbox> Checked</label>
+      <label class="opt"><aid-checkbox indeterminate></aid-checkbox> Mixed</label>
+      <label class="opt"><aid-checkbox force="hover"></aid-checkbox> Hover</label>
+      <label class="opt"><aid-checkbox checked force="focus"></aid-checkbox> Focus</label>
+      <label class="opt"><aid-checkbox disabled></aid-checkbox> Disabled</label>
+      <label class="opt"><aid-checkbox checked disabled></aid-checkbox> Disabled, checked</label>
+    </div>
+    <h3>Radio</h3>
+    <div class="row" role="radiogroup" aria-label="Status">
+      <label class="opt"><aid-radio name="st" checked></aid-radio> Approved</label>
+      <label class="opt"><aid-radio name="st"></aid-radio> Draft</label>
+      <label class="opt"><aid-radio name="st"></aid-radio> Rejected</label>
+      <label class="opt"><aid-radio name="st2" force="focus"></aid-radio> Focus</label>
+      <label class="opt"><aid-radio name="st3" disabled></aid-radio> Disabled</label>
+    </div>
+    <h3>Switch</h3>
+    <div class="row">
+      <label class="opt"><aid-switch></aid-switch> Off</label>
+      <label class="opt"><aid-switch checked></aid-switch> On</label>
+      <label class="opt"><aid-switch checked force="focus"></aid-switch> Focus</label>
+      <label class="opt"><aid-switch disabled></aid-switch> Disabled</label>
+    </div>
+  </section>
+
+  <section class="sec" id="nav">
+    <h2 data-fa="تب و پیشرفت">Tabs and progress</h2>
+    <h3>Tabs</h3>
+    <aid-tabs aria-label="Sections">
+      <aid-tab selected><aid-icon name="home"></aid-icon><span data-fa="خانه">Home</span></aid-tab>
+      <aid-tab><aid-icon name="file"></aid-icon><span data-fa="پرونده">Files</span></aid-tab>
+      <aid-tab><aid-icon name="chart"></aid-icon><span data-fa="گزارش">Reports</span></aid-tab>
+      <aid-tab disabled><aid-icon name="user"></aid-icon><span data-fa="من">Me</span></aid-tab>
+    </aid-tabs>
+    <h3>Progress</h3>
+    <div class="stack" style="width:min(100%,380px);gap:16px">
+      <aid-progress value="40" aria-label="Upload"></aid-progress>
+      <aid-progress value="100" aria-label="Done"></aid-progress>
+      <aid-progress aria-label="Working"></aid-progress>
+    </div>
+  </section>
+
+  <section class="sec" id="surface">
+    <h2 data-fa="کارت و دیالوگ">Card and dialog</h2>
+    <div class="cards">
+      <aid-card><h4 data-fa="پرونده‌ی ۱۲۴۸">Case 1248</h4><p data-fa="خدمات سرپایی محاسبه شد و برای تأیید ارسال می‌شود.">Outpatient services were calculated and sent for approval.</p></aid-card>
+      <aid-card interactive><h4 data-fa="کارت تعاملی">Interactive card</h4><p data-fa="روی آن بروید و فشار دهید.">Hover and press it.</p></aid-card>
+    </div>
+    <h3>Dialog</h3>
+    <p class="note">Elevation is fog. An open dialog fills the scene with a thin gas that veils everything below it.</p>
+    <aid-button id="openDlg" data-fa="بازکردن دیالوگ">Open dialog</aid-button>
+  </section>
+
+  <section class="sec" id="use">
+    <h2 data-fa="استفاده">Use it</h2>
+    <p class="note">One fixed scene serves a whole app or page: one GPU context, and only containers in view are simulated. It works the same in an installed PWA.</p>
+<pre>&lt;script type="module" src="aid.js"&gt;&lt;/script&gt;
+
+&lt;aid-scene fixed style="--aid-gas: xenon"&gt;
+  &lt;!-- your whole app --&gt;
+  &lt;aid-button variant="primary"&gt;&lt;aid-icon name="plus"&gt;&lt;/aid-icon&gt; New case&lt;/aid-button&gt;
+  &lt;aid-field&gt;&lt;input placeholder="Search"&gt;&lt;/aid-field&gt;
+  &lt;label&gt;&lt;aid-switch checked&gt;&lt;/aid-switch&gt; Notifications&lt;/label&gt;
+&lt;/aid-scene&gt;</pre>
+    <p class="note">Up to 96 gas containers can be in view at once. On HTML pages the gas is drawn over the page, so content light and refraction are not available; settling, pressure, excitation and depth are.</p>
+  </section>
+
+  <footer>AID · MIT © Milad Karami Motlaq · <a href="index.html">Home</a> · <a href="lab.html">Lab</a> · <a href="https://github.com/miladkm77/aid">GitHub</a></footer>
+</div>
+
+<aid-dialog id="dlg" aria-labelledby="dlgT">
+  <h4 id="dlgT" data-fa="این پرونده تأیید شود؟">Approve this case?</h4>
+  <p data-fa="پس از تأیید، پرونده برای مرکز درمانی ارسال می‌شود.">After approval the case is sent to the clinic.</p>
+  <div class="row">
+    <aid-button variant="quiet" id="dlgNo" data-fa="انصراف">Cancel</aid-button>
+    <aid-button variant="primary" id="dlgYes" data-fa="تأیید">Approve</aid-button>
+  </div>
+</aid-dialog>
+</aid-scene>
+
+<script type="module">
+import { ICONS, GASES } from './aid.js';
+const $ = (s, r = document) => r.querySelector(s), scene = $('#scene'), root = document.documentElement;
+const el = (tag, attrs = {}, text) => { const e = document.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
+
+/* foundations */
+for (const [name, label] of [['bg', 'Page'], ['surface', 'Surface'], ['ink', 'Text'], ['ink-muted', 'Text, muted'], ['line', 'Line']]) {
+  const c = el('div', { class: 'chipc' }); c.innerHTML = `<i style="background:var(--aid-color-${name})"></i><div><b>${label}</b><span class="mono">--aid-color-${name}</span></div>`; $('#swN').append(c);
+}
+for (const id of Object.keys(GASES)) { const g = GASES[id];
+  const c = el('div', { class: 'chipc' }); c.innerHTML = `<i style="background:rgb(${g.emission.join(',')})"></i><div><b>${g.symbol} · ${id}</b><span class="mono">${g.emission.join(', ')}</span></div>`; $('#swG').append(c); }
+for (const [t, px, w] of [['2xl', 32, 800], ['xl', 24, 600], ['lg', 20, 600], ['md', 16, 400], ['sm', 14, 400], ['xs', 12, 400]]) {
+  const r = el('div'); r.innerHTML = `<span class="mono">--aid-text-${t} · ${px}px</span><span style="font-size:var(--aid-text-${t});font-weight:${w};line-height:1.4">Xenon settles · زنون ته‌نشین می‌شود</span>`; $('#typeScale').append(r); }
+for (const [n, px] of [[1, 4], [2, 8], [3, 12], [4, 16], [5, 24], [6, 32], [7, 48]]) { const d = el('div'); d.innerHTML = `<i style="width:${px}px;height:${px}px;border-radius:2px"></i>${n} · ${px}`; $('#mSpace').append(d); }
+for (const [n, r] of [['sm', 8], ['md', 14], ['lg', 20], ['xl', 24], ['pill', 999]]) { const d = el('div'); d.innerHTML = `<i style="width:64px;height:44px;border-radius:${r}px;background:none;border:1.5px solid var(--aid-color-ink)"></i>${n} · ${r === 999 ? 'full' : r}`; $('#mRadius').append(d); }
+for (const [n, h] of [['sm', 36], ['md', 44], ['lg', 52]]) { const d = el('div'); d.innerHTML = `<i style="width:28px;height:${h}px;border-radius:6px"></i>${n} · ${h}`; $('#mSize').append(d); }
+for (const name of Object.keys(ICONS)) { const d = el('div'); d.append(el('aid-icon', { name }), document.createTextNode(name)); $('#iconGrid').append(d); }
+
+/* state matrices */
+const states = [['Rest', {}], ['Hover', { force: 'hover' }], ['Pressed', { force: 'pressed' }], ['Focus', { force: 'focus' }], ['Loading', { loading: '' }], ['Disabled', { disabled: '' }]];
+const mb = $('#mxButton'); mb.append(el('span'));
+for (const [s] of states) mb.append(el('span', { class: 'h' }, s));
+for (const [v, label, fa] of [['', 'Default', 'تأیید'], ['primary', 'Primary', 'تأیید'], ['danger', 'Danger', 'حذف'], ['quiet', 'Quiet', 'انصراف']]) {
+  mb.append(el('span', { class: 'r' }, label));
+  for (const [, a] of states) { const b = el('aid-button', { ...a, ...(v ? { variant: v } : {}), 'data-fa': fa }, v === 'danger' ? 'Delete' : v === 'quiet' ? 'Cancel' : 'Approve'); mb.append(b); }
+}
+const mc = $('#mxChip');
+for (const [s, a] of [['Unselected', {}], ['Selected', { selected: '' }], ['Hover', { force: 'hover' }], ['Focus', { selected: '', force: 'focus' }], ['Disabled', { disabled: '' }], ['Static', { static: '' }]]) {
+  const d = el('div', { class: 'stack' }); d.append(el('aid-chip', { ...a, 'data-fa': 'فیلتر' }, 'Filter'), el('span', { class: 'cap' }, s)); mc.append(d);
+}
+
+/* dialog */
+const dlg = $('#dlg');
+$('#openDlg').addEventListener('click', () => dlg.show());
+$('#dlgNo').addEventListener('click', () => dlg.close());
+$('#dlgYes').addEventListener('click', () => dlg.close());
+
+/* toolbar */
+function seg(id, f) { const g = $('#' + id); g.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return;
+  g.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); f(b.dataset.v); }); }
+seg('segTheme', (v) => { if (v === 'auto') root.removeAttribute('data-aid-theme'); else root.setAttribute('data-aid-theme', v); scene.refresh(); });
+seg('segGas', (v) => { scene.style.setProperty('--aid-gas', v); scene.refresh(); });
+seg('segDir', (v) => {
+  root.dir = v; root.lang = v === 'rtl' ? 'fa' : 'en';
+  document.querySelectorAll('[data-fa]').forEach((e) => { if (!e.dataset.en) e.dataset.en = e.textContent; e.textContent = v === 'rtl' ? e.dataset.fa : e.dataset.en; });
+  document.querySelectorAll('[data-fa-ph]').forEach((e) => { if (!e.dataset.enPh) e.dataset.enPh = e.placeholder; e.placeholder = v === 'rtl' ? e.dataset.faPh : e.dataset.enPh; });
+  document.querySelectorAll('aid-icon').forEach((i) => i.refresh());
+  scene.refresh();
+});
+scene.addEventListener('aid-stats', (e) => { const s = e.detail; $('#stats').textContent = s.error ? s.error : `${s.tier} · ${Math.round(s.fps)} fps · ${s.state}`; });
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

@@ -1,8 +1,8 @@
-# AID Gas Material — Specification v0.2
+# AID Gas Material — Specification v0.3
 
 > **Summary.** AID is a user-interface material, not an effect. Every component (button, bar, tab) is a sealed container of noble gas. The look comes from a physical model: a compressible gas that gives way under a finger and settles without waves, a gas that pools under its own weight, takes its colour from the light of the content around it, and bends the background only where it is disturbed. Every behaviour is labelled *physical*, *approximation* or *artistic*. The material's parameters belong to AID and are set like any other CSS token.
 
-Status: draft · Reference implementation: `aid-gas` 0.2.0 (WebGL2, Web Components) · License: MIT
+Status: draft · Reference implementation: `aid-gas` 0.3.0 (WebGL2, Web Components) · License: MIT
 
 ## 1. Principle
 
@@ -55,9 +55,12 @@ Interaction states change density only; size and position never change:
 | State | Density factor | Transition |
 |---|---|---|
 | rest | 1 | — |
+| hover | 1.1 | the gas gathers under a pointer (mouse only) |
 | pressed | 1.25 | compress fast (k = 14 s⁻¹) |
 | release | back to 1 | relax slowly (k = 2.5 s⁻¹) |
 | disabled | 0 (evacuated) | dashed wall |
+| unchecked box, switch track, unselected chip | 0 – 0.22 | the wall stays visible while the chamber is empty |
+| loading | 1, excitation pulsing 0.25 – 0.55 at 0.8 Hz | — |
 | tab not selected | 0 | chamber drains |
 
 ### 3.3 Optics
@@ -105,7 +108,8 @@ Container level, set on any `<aid-gas>`, `<aid-button>`, `<aid-tabs>`, `<aid-tab
 | `--aid-pressure` | 0 – 2 | 1 | density held by the container |
 | `--aid-membrane` | 0 – 1 | 1 | wall visibility |
 | `--aid-profile` | 0 – 1 | 0.2 | softness of the gas at the wall |
-| `--aid-excitation` | 0 – 1 | 0 | glow discharge. `<aid-button>` sets 0.6 while it has keyboard focus |
+| `--aid-excitation` | 0 – 1 | 0 | glow discharge. Controls set it while they have keyboard focus; primary buttons and checked controls hold a lower level at rest |
+| `--aid-excitation-color` | r,g,b | the gas | colour of the excited gas for a semantic state (danger, success, warning, info). **Artistic**: one gas has one discharge colour |
 
 ## 5. Gas data
 
@@ -121,6 +125,10 @@ Container level, set on any `<aid-gas>`, `<aid-button>`, `<aid-tabs>`, `<aid-tab
 Discharge colours: LibreTexts, *Gas Discharge Tubes*. Shadowgraph response to the second derivative of the refractive index: Wikipedia, *Shadowgraph*.
 
 Xenon is the default: the largest refraction and scattering among stable noble gases, the heaviest layer, and the slowest, calmest motion. Helium and neon scatter so little that they are close to invisible; they show mostly as shimmer.
+
+### Scene size and limits
+
+A scene covers its own box, or the viewport with the `fixed` attribute (one canvas and one GPU context for a whole app). Container data is passed to the GPU as a texture, so up to 96 containers can be in view at once whatever the uniform limit of the device. A coarse mask from the geometry pass lets the render pass skip the per-container loop for pixels that are not near a container. Containers are clipped to their scrolling ancestors.
 
 ## 6. Backdrops
 
@@ -144,7 +152,9 @@ Not yet measured: sustained FPS, thermal and battery behaviour on real phones (5
 ## 8. Accessibility
 
 - Labels sit in the DOM above the gas and are never refracted. At rest the content under a container is veiled but not displaced.
-- `<aid-button>`: role button, Enter / Space, `aria-disabled`. Keyboard focus keeps the outline and adds excitation. `<aid-tabs>`: role tablist, RTL-aware arrow keys.
+- Focus always keeps a 2 px outline; excitation is added to it, never used alone.
+- Selected, checked and invalid states never rely on colour alone: a check, dot or dash icon, a moved thumb, or a message carries them too.
+- `<aid-button>`: role button, Enter / Space, `aria-disabled`, `aria-busy` while loading. `<aid-checkbox>`, `<aid-radio>`, `<aid-switch>`: native roles, `aria-checked`, Space; radios use a roving tabindex and arrow keys. `<aid-dialog>`: `role=dialog`, `aria-modal`, focus moves in and returns, Tab is trapped, Escape closes. `<aid-field>` wraps a native control, which keeps its own semantics. `<aid-tabs>`: role tablist, RTL-aware arrow keys.
 - `prefers-reduced-motion` selects the static tier.
 - Open: a measured contrast floor for labels over the densest smoke, and a high-contrast mode.
 

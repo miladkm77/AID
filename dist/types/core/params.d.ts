@@ -21,6 +21,7 @@ import { GasId } from './gases';
  *   --aid-membrane       0..1   visibility of the container wall
  *   --aid-profile        0..1   softness of the gas at the wall (0 = filled to the wall)
  *   --aid-excitation     0..1   glow discharge: the gas emits the colour of its species
+ *   --aid-excitation-color r,g,b  overrides that colour for a semantic state (danger, success); artistic
  */
 export type Quality = 'auto' | 'static' | 'efficient' | 'high';
 export interface SceneParams {
@@ -41,6 +42,8 @@ export interface ContainerParams {
     profile: number;
     excitation: number;
     weight: number;
+    /** colour of the excited gas as r,g,b 0..255; null = the discharge colour of the gas */
+    excitationColor: number[] | null;
 }
 export declare const SCENE_DEFAULTS: SceneParams;
 export declare const CONTAINER_DEFAULTS: ContainerParams;

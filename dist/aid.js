@@ -139,7 +139,7 @@ var GL = class {
 };
 
 // src/gl/shaders.ts
-var MAX_CONTAINERS = 16;
+var MAX_CONTAINERS = 96;
 var VERTEX = `#version 300 es
 in vec2 aPos;uniform vec2 texel;out vec2 vUv,vL,vR,vT,vB;
 void main(){vUv=aPos*.5+.5;vL=vUv-vec2(texel.x,0.);vR=vUv+vec2(texel.x,0.);vT=vUv+vec2(0.,texel.y);vB=vUv-vec2(0.,texel.y);gl_Position=vec4(aPos,0.,1.);}`;
@@ -148,22 +148,28 @@ precision highp float;precision highp sampler2D;
 in vec2 vUv,vL,vR,vT,vB;out vec4 o;
 `;
 var CONTAINERS = `
-uniform vec4 uR[${MAX_CONTAINERS}];uniform vec4 uI[${MAX_CONTAINERS}];uniform vec4 uE[${MAX_CONTAINERS}];uniform int uN;uniform vec2 uPx;uniform vec3 uGv;
+uniform sampler2D uCt;uniform int uN;uniform vec2 uPx;uniform vec3 uGv;
+#define CD(i,c) texelFetch(uCt,ivec2(c,i),0)
 float sdRR(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+r;return length(max(q,0.))+min(max(q.x,q.y),0.)-r;}
-float elD(int i,vec2 uv){vec4 R=uR[i];vec2 lo=R.xy*uPx,hi=R.zw*uPx,hb=(hi-lo)*.5;return sdRR(uv*uPx-(lo+hi)*.5,hb,min(uI[i].z,min(hb.x,hb.y)));}
-float elT(int i,float d){vec2 hb=(uR[i].zw-uR[i].xy)*uPx*.5;float w=max(min(hb.x,hb.y)*uI[i].y,1.5);float x=clamp(-d/w,0.,1.);return x*x*(3.-2.*x);}
+/* far from the container's box by more than m px: skipped before any distance is computed */
+bool elFar(vec4 R,vec2 uv,float m){vec2 q=vec2(m)/uPx;return uv.x<R.x-q.x||uv.x>R.z+q.x||uv.y<R.y-q.y||uv.y>R.w+q.y;}
+float elD0(vec4 R,vec4 I,vec2 uv){vec2 lo=R.xy*uPx,hi=R.zw*uPx,hb=(hi-lo)*.5;return sdRR(uv*uPx-(lo+hi)*.5,hb,min(I.z,min(hb.x,hb.y)));}
+float elC(vec4 K,vec2 uv){vec2 p=uv*uPx,lo=K.xy*uPx,hi=K.zw*uPx;return max(max(lo.x-p.x,p.x-hi.x),max(lo.y-p.y,p.y-hi.y));}
+float elT(vec4 R,vec4 I,float d){vec2 hb=(R.zw-R.xy)*uPx*.5;float w=max(min(hb.x,hb.y)*I.y,1.5);float x=clamp(-d/w,0.,1.);return x*x*(3.-2.*x);}
 /* settling: density profile of a gas that is heavier (or lighter) than the air it shares the container with */
-float elS(int i,vec2 uv){
- vec4 R=uR[i];vec2 c=(R.xy+R.zw)*.5*uPx,hb=(R.zw-R.xy)*uPx*.5;
+float elS(vec4 R,vec4 E,vec2 uv){
+ vec2 c=(R.xy+R.zw)*.5*uPx,hb=(R.zw-R.xy)*uPx*.5;
  float L=2.*(abs(uGv.x)*hb.x+abs(uGv.y)*hb.y);
- float h=clamp(L*.5-dot(uv*uPx-c,uGv.xy),0.,L),k=uGv.z*uE[i].y;
+ float h=clamp(L*.5-dot(uv*uPx-c,uGv.xy),0.,L),k=uGv.z*E.y;
  return exp(-h*k)*(1.+.5*min(L*k,2.));}
 `;
 var GEO = HEAD + CONTAINERS + `
-uniform vec4 uM[${MAX_CONTAINERS}];
-void main(){float m=0.,g=0.;vec2 mv=vec2(0.);
- for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;float k=1.-smoothstep(-1.,1.,elD(i,vUv));if(k>m)mv=uM[i].xy;m=max(m,k);g+=k*uI[i].x*elS(i,vUv);}
- o=vec4(m,g,mv);}`;
+uniform vec2 texel;
+void main(){float m=0.,g=0.;bool near=false;vec2 mv=vec2(0.);float cell=uPx.x*texel.x,reachPx=1.6*cell+2.;
+ for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;vec4 R=CD(i,0);if(elFar(R,vUv,reachPx))continue;
+  vec4 I=CD(i,1);float d=max(elD0(R,I,vUv),elC(CD(i,3),vUv));if(d<reachPx)near=true;
+  float k=1.-smoothstep(-1.,1.,d);if(k<=0.)continue;if(k>m)mv=CD(i,5).xy;m=max(m,k);g+=k*I.x*elS(R,CD(i,2),vUv);}
+ o=vec4(m,near?g:-1.,mv);}`;
 var GAS = HEAD + `
 uniform sampler2D uS,uG,uNz;uniform vec2 texel,uPx;
 uniform float dt,c2,gam,tAmp,tSpd,t,vmax,rk,diff;uniform vec4 uPtr;uniform vec2 uPv;
@@ -196,10 +202,10 @@ void main(){
 var RENDER = HEAD + CONTAINERS + `
 uniform sampler2D uFeed,uS,uNz,uGt;
 uniform float scr,vf,amp,dn,sig,smoke,reach,flowT,smix,hasSim,hasFeed,alb,agit,glow,fdpr;
-uniform vec3 scene,tw,emis;uniform vec4 mem,uPtr;uniform int mode,taps;
+uniform vec3 scene,tw;uniform vec4 mem,uPtr;uniform int mode,taps;
 vec2 fuv(vec2 s){float fy=scr+(1.-s.y)*vf;return vec2(clamp(s.x,0.,1.),1.-clamp(fy,0.,1.));}
 vec3 feed(vec2 s){return texture(uFeed,fuv(s)).rgb;}
-float fbm(vec2 p){return texture(uNz,p).x*.55+texture(uNz,p*1.97+.37).x*.3+texture(uNz,p*3.9+.71).x*.15;}
+float fbm(vec2 p){return texture(uNz,p).x*.62+texture(uNz,p*1.97+.37).x*.3+texture(uNz,p*3.9+.71).x*.08;}
 float luma(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
 /* The simulation supplies how far the gas is from its settled state, as the ratio \u03C1/\u03C1_eq (1 at rest). The settled
    profile itself is evaluated per pixel from the container shapes, so its edges stay sharp at any grid size. */
@@ -207,12 +213,14 @@ float ratio(vec2 uv){
  if(hasSim>0.){vec4 G=texture(uGt,uv);return G.x>.02?clamp(texture(uS,uv).x/max(G.y,.03),0.,4.):1.;}
  vec2 d=(uv-uPtr.xy)*uPx;return 1.-min(uPtr.z/600.,.7)*exp(-dot(d,d)/(uPtr.w*uPtr.w));}
 void main(){
- bool near=false;float memv=0.,th=0.,ex=0.,wall=1e4,tg=0.;
- for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;float d=elD(i,vUv);if(d<1.)near=true;float a=abs(uI[i].w);
-  wall=min(wall,abs(d));if(d<1.)tg+=(1.-smoothstep(-1.,1.,d))*uI[i].x*elS(i,vUv);if(d<=0.){th=max(th,elT(i,d));ex=max(ex,uE[i].x);}
-  if(a>0.){float ring=1.-smoothstep(0.,1.9,abs(d+.9));   /* a soft wall, not a hairline */
-   if(uI[i].w<0.)ring*=step(.5,fract((vUv.x*uPx.x+vUv.y*uPx.y)/7.));memv=max(memv,ring*a);}}
- if(!near||mode==3){if(hasFeed>0.)o=vec4((mode==0||mode==3)?feed(vUv):vec3(.04),1.);else o=vec4(0.);return;}
+ bool near=false;float memv=0.,th=0.,ex=0.,wall=1e4,tg=0.;vec3 emis=vec3(0.);
+ if(mode!=3&&texture(uGt,vUv).y>-.999)                            /* the coarse mask says a container is close */
+ for(int i=0;i<${MAX_CONTAINERS};i++){if(i>=uN)break;vec4 R=CD(i,0);if(elFar(R,vUv,16.))continue;
+  vec4 I=CD(i,1),E=CD(i,2);float d0=elD0(R,I,vUv),dc=elC(CD(i,3),vUv),d=max(d0,dc);if(d<1.)near=true;float a=abs(I.w);
+  wall=min(wall,abs(d));if(d<1.)tg+=(1.-smoothstep(-1.,1.,d))*I.x*elS(R,E,vUv);if(d<=0.){th=max(th,elT(R,I,d));if(E.x>ex){ex=E.x;emis=CD(i,4).rgb;}}
+  if(a>0.&&dc<0.){float ring=1.-smoothstep(0.,1.9,abs(d0+.9));   /* a soft wall, not a hairline; none along a clip edge */
+   if(I.w<0.)ring*=step(.5,fract((vUv.x*uPx.x+vUv.y*uPx.y)/7.));memv=max(memv,ring*a);}}
+ if(!near){if(hasFeed>0.)o=vec4((mode==0||mode==3)?feed(vUv):vec3(.04),1.);else o=vec4(0.);return;}
  float s0=ratio(vUv),rho=tg*s0;
  /* only the disturbance (density minus the settled profile) refracts: it is zero at rest, so a wall never acts as a lens */
  float dl=tg*(ratio(vL)-1.),dr=tg*(ratio(vR)-1.),dT=tg*(ratio(vT)-1.),dB=tg*(ratio(vB)-1.),d0=tg*(s0-1.);
@@ -310,7 +318,7 @@ var SCENE_DEFAULTS = {
   spectral: 0.1,
   quality: "auto"
 };
-var CONTAINER_DEFAULTS = { pressure: 1, membrane: 1, profile: 0.2, excitation: 0, weight: 0.6 };
+var CONTAINER_DEFAULTS = { pressure: 1, membrane: 1, profile: 0.2, excitation: 0, weight: 0.6, excitationColor: null };
 function num(cs, name, fallback, lo, hi) {
   const raw = cs.getPropertyValue(name).trim();
   if (!raw) return fallback;
@@ -341,7 +349,8 @@ function readContainerParams(el) {
     membrane: num(cs, "--aid-membrane", CONTAINER_DEFAULTS.membrane, 0, 1),
     profile: num(cs, "--aid-profile", CONTAINER_DEFAULTS.profile, 0, 1),
     excitation: num(cs, "--aid-excitation", CONTAINER_DEFAULTS.excitation, 0, 1),
-    weight: num(cs, "--aid-weight", CONTAINER_DEFAULTS.weight, 0, 1)
+    weight: num(cs, "--aid-weight", CONTAINER_DEFAULTS.weight, 0, 1),
+    excitationColor: triple(cs.getPropertyValue("--aid-excitation-color"))
   };
 }
 function densityFactor(temperature01) {
@@ -352,6 +361,10 @@ function kelvin(temperature01) {
 }
 function albedo(smoke) {
   return 1 - 0.42 * smoke;
+}
+function triple(v) {
+  const p = v.split(",").map((x) => parseFloat(x));
+  return p.length >= 3 && p.slice(0, 3).every((x) => isFinite(x)) ? p.slice(0, 3) : null;
 }
 
 // src/core/tiers.ts
@@ -372,6 +385,14 @@ function chooseTier(q) {
 }
 
 // src/engine/engine.ts
+function within(outer, inner) {
+  let n = inner;
+  while (n) {
+    if (n === outer) return true;
+    n = n.parentNode || (n instanceof ShadowRoot ? n.host : null);
+  }
+  return false;
+}
 var SCALE_HEIGHT = 14;
 var RAYLEIGH = (() => {
   const w = [Math.pow(465 / 610, 4), Math.pow(465 / 550, 4), 1];
@@ -379,9 +400,10 @@ var RAYLEIGH = (() => {
   return w.map((x) => x / m);
 })();
 var GasEngine = class {
-  constructor(host, canvas, transparent) {
+  constructor(host, canvas, transparent, fixed = false) {
     this.host = host;
     this.canvas = canvas;
+    this.fixed = fixed;
     this.st = null;
     this.geo = null;
     this.slots = /* @__PURE__ */ new Map();
@@ -390,6 +412,11 @@ var GasEngine = class {
     this.uI = new Float32Array(MAX_CONTAINERS * 4);
     this.uM = new Float32Array(MAX_CONTAINERS * 4);
     this.uE = new Float32Array(MAX_CONTAINERS * 4);
+    this.uK = new Float32Array(MAX_CONTAINERS * 4);
+    this.uC = new Float32Array(MAX_CONTAINERS * 4);
+    this.warned = false;
+    /** all container data, one row of six texels per container (see CONTAINERS in shaders.ts) */
+    this.cdata = new Float32Array(MAX_CONTAINERS * 24);
     this.grav = { x: 0, y: -1, k: 0 };
     this.cssAngle = NaN;
     this.cssFade = NaN;
@@ -475,12 +502,17 @@ var GasEngine = class {
     this.P = { geo: this.g.program(GEO), gas: this.g.program(GAS), render: this.g.program(RENDER) };
     this.noise = this.g.noiseTexture();
     this.feedTex = gl.createTexture();
+    this.ctex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.ctex);
+    this.g.texParams(gl.NEAREST, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 6, MAX_CONTAINERS, 0, gl.RGBA, gl.FLOAT, null);
     this.bindEvents();
   }
   /* ---------------- containers ---------------- */
   add(c) {
     if (this.slots.has(c)) return;
-    const s = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, ev: 0, wv: CONTAINER_DEFAULTS.weight, z: 0, rect: null, rad: 0, veil: "", lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
+    const s = { c, params: { ...CONTAINER_DEFAULTS }, pv: 0, ev: 0, wv: CONTAINER_DEFAULTS.weight, z: 0, rect: null, rad: 0, veil: "", clips: [], lastX: NaN, lastY: NaN, accX: 0, accY: 0 };
     this.slots.set(c, s);
     this.order.push(s);
     this.refreshParams(true);
@@ -524,8 +556,14 @@ var GasEngine = class {
     return this.g.maxTexture;
   }
   /* ---------------- sizing ---------------- */
+  /** the box the canvas covers: the scene element, or the viewport for a fixed scene */
+  frame() {
+    if (!this.fixed) return this.host.getBoundingClientRect();
+    const w = document.documentElement.clientWidth || window.innerWidth, h = window.innerHeight;
+    return { left: 0, top: 0, right: w, bottom: h, width: w, height: h };
+  }
   resize() {
-    const r = this.host.getBoundingClientRect();
+    const r = this.frame();
     this.W = Math.max(1, r.width);
     this.H = Math.max(1, r.height);
     this.refreshParams(true);
@@ -561,6 +599,15 @@ var GasEngine = class {
       const cs = getComputedStyle(s.c.el);
       s.params = readContainerParams(s.c.el);
       s.z = parseInt(cs.zIndex, 10) || 0;
+      s.clips = [];
+      let a = s.c.el.parentNode || (s.c.el.getRootNode().host ?? null);
+      while (a && a !== this.host) {
+        if (a instanceof Element) {
+          const o = getComputedStyle(a);
+          if (o.overflowX !== "visible" || o.overflowY !== "visible") s.clips.push(a);
+        }
+        a = a.parentNode || (a instanceof ShadowRoot ? a.host : null);
+      }
     }
     const t = chooseTier(this.scene.quality);
     if (t !== this.tier) {
@@ -570,7 +617,7 @@ var GasEngine = class {
   }
   /* ---------------- geometry ---------------- */
   collect(dt) {
-    const hr = this.host.getBoundingClientRect();
+    const hr = this.frame();
     const df = densityFactor(this.scene.temperature);
     let moving = false;
     const b = buoyancy(GASES[this.scene.gas]);
@@ -593,19 +640,39 @@ var GasEngine = class {
     this.n = 0;
     for (const s of this.order) {
       s.rect = null;
-      if (this.n >= MAX_CONTAINERS) break;
+      if (this.n >= MAX_CONTAINERS) {
+        if (!this.warned) {
+          this.warned = true;
+          console.warn(`AID: more than ${MAX_CONTAINERS} gas containers are visible at once; the rest are drawn without gas.`);
+        }
+        break;
+      }
       const target = s.c.stateFactor() * s.params.pressure;
       const k = target > s.pv ? s.c.stateFactor() > 1 ? 14 : 4 : 2.5;
       s.pv += (target - s.pv) * (dt > 0 ? 1 - Math.exp(-dt * k) : 1);
       if (Math.abs(target - s.pv) > 3e-3) moving = true;
-      const et = s.c.dashed() ? 0 : s.params.excitation;
+      let et = s.c.dashed() ? 0 : s.params.excitation;
+      if (et < 1 && s.c.busy?.()) {
+        et = Math.max(et, 0.25 + 0.3 * (0.5 + 0.5 * Math.sin(performance.now() / 1e3 * 5)));
+        moving = true;
+      }
       s.ev += (et - s.ev) * (dt > 0 ? 1 - Math.exp(-dt * 7) : 1);
       if (Math.abs(et - s.ev) > 3e-3) moving = true;
       s.wv += (s.params.weight - s.wv) * e;
       if (Math.abs(s.params.weight - s.wv) > 3e-3) moving = true;
       const r = s.c.el.getBoundingClientRect();
-      if (r.width < 1 || r.bottom < hr.top || r.top > hr.bottom || r.right < hr.left || r.left > hr.right) continue;
-      const empty = s.pv < 4e-3 && !s.c.dashed();
+      if (r.width < 1) continue;
+      let k0 = hr.left, k1 = hr.right, k2 = hr.top, k3 = hr.bottom;
+      for (const a of s.clips) {
+        const q = a.getBoundingClientRect();
+        k0 = Math.max(k0, q.left);
+        k1 = Math.min(k1, q.right);
+        k2 = Math.max(k2, q.top);
+        k3 = Math.min(k3, q.bottom);
+      }
+      if (r.bottom <= k2 || r.top >= k3 || r.right <= k0 || r.left >= k1) continue;
+      const shell = s.c.shell?.() ?? false;
+      const empty = s.pv < 4e-3 && !s.c.dashed() && !shell;
       if (empty) continue;
       const j = this.n * 4;
       const x0 = (r.left - hr.left) / this.W, x1 = (r.right - hr.left) / this.W;
@@ -622,7 +689,15 @@ var GasEngine = class {
       this.uI[j + 2] = rad;
       this.uE[j] = s.ev * Math.min(1, s.pv);
       this.uE[j + 1] = s.wv;
-      this.uI[j + 3] = (s.c.dashed() ? -1 : 1) * s.params.membrane * Math.min(1, s.c.dashed() ? 1 : s.pv * 1.5);
+      this.uI[j + 3] = (s.c.dashed() ? -1 : 1) * s.params.membrane * (s.c.dashed() || shell ? 1 : Math.min(1, s.pv * 1.5));
+      this.uK[j] = (k0 - hr.left) / this.W;
+      this.uK[j + 1] = 1 - (k3 - hr.top) / this.H;
+      this.uK[j + 2] = (k1 - hr.left) / this.W;
+      this.uK[j + 3] = 1 - (k2 - hr.top) / this.H;
+      const col = s.params.excitationColor || GASES[this.scene.gas].emission;
+      this.uC[j] = col[0] / 255;
+      this.uC[j + 1] = col[1] / 255;
+      this.uC[j + 2] = col[2] / 255;
       const mx = isNaN(s.lastX) ? 0 : x0 - s.lastX, my = isNaN(s.lastY) ? 0 : y0 - s.lastY;
       s.accX += mx;
       s.accY += my;
@@ -649,7 +724,7 @@ var GasEngine = class {
         let x0 = 0, y0 = 0, x1 = 0, y1 = 0, rad = 0, best = 0;
         for (const lo of this.order) {
           const b = lo.rect;
-          if (!b || lo === up || lo.z > up.z || up.c.el.contains(lo.c.el) || lo.c.el.contains(up.c.el)) continue;
+          if (!b || lo === up || lo.z > up.z || within(up.c.el, lo.c.el) || within(lo.c.el, up.c.el)) continue;
           if (lo.z === up.z && !(lo.c.el.compareDocumentPosition(up.c.el) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
           const w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
           if (w < 1 || h < 1 || w * h <= best) continue;
@@ -660,7 +735,8 @@ var GasEngine = class {
           y1 = b.bottom;
           rad = lo.rad;
         }
-        if (x1 > x0) {
+        if (up.c.veilAll?.()) veil = "none";
+        else if (x1 > x0) {
           const o = 1.5, f = (v) => Math.round(v * 2) / 2;
           veil = `inset(${f(y0 - a.top - o)}px ${f(a.right - x1 - o)}px ${f(a.bottom - y1 - o)}px ${f(x0 - a.left - o)}px round ${Math.round(rad)}px)`;
         }
@@ -680,10 +756,20 @@ var GasEngine = class {
   }
   setContainers(p) {
     const gl = this.gl, u = p.u;
-    if (u.uR) gl.uniform4fv(u.uR, this.uR);
-    if (u.uI) gl.uniform4fv(u.uI, this.uI);
-    if (u.uM) gl.uniform4fv(u.uM, this.uM);
-    if (u.uE) gl.uniform4fv(u.uE, this.uE);
+    if (u.uCt) {
+      const d = this.cdata;
+      for (let i = 0; i < this.n; i++) {
+        const j = i * 4, o = i * 24;
+        d.set(this.uR.subarray(j, j + 4), o);
+        d.set(this.uI.subarray(j, j + 4), o + 4);
+        d.set(this.uE.subarray(j, j + 4), o + 8);
+        d.set(this.uK.subarray(j, j + 4), o + 12);
+        d.set(this.uC.subarray(j, j + 4), o + 16);
+        d.set(this.uM.subarray(j, j + 4), o + 20);
+      }
+      gl.uniform1i(u.uCt, this.g.bind(5, this.ctex));
+      if (this.n) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 6, this.n, gl.RGBA, gl.FLOAT, d.subarray(0, this.n * 24));
+    }
     if (u.uGv) gl.uniform3f(u.uGv, this.grav.x, this.grav.y, this.grav.k);
     if (u.uN) gl.uniform1i(u.uN, this.n);
     if (u.uPx) gl.uniform2f(u.uPx, this.W, this.H);
@@ -729,6 +815,10 @@ var GasEngine = class {
     st.swap();
   }
   render() {
+    if (this.geo) {
+      this.use(this.P.geo);
+      this.g.draw(this.geo);
+    }
     if (!this.st) return;
     const gl = this.gl, g = this.g, P = this.P.render, u = P.u, sc = this.scene, gas = GASES[sc.gas];
     this.use(P);
@@ -744,7 +834,6 @@ var GasEngine = class {
     gl.uniform1f(u.fdpr, this.feedDpr);
     gl.uniform1f(u.agit, sc.temperature);
     gl.uniform1f(u.glow, sc.glow);
-    gl.uniform3f(u.emis, gas.emission[0] / 255, gas.emission[1] / 255, gas.emission[2] / 255);
     gl.uniform1f(u.smoke, sc.smoke);
     gl.uniform1f(u.reach, sc.lightReach);
     gl.uniform1f(u.flowT, this.flowT);
@@ -825,7 +914,8 @@ var GasEngine = class {
   bindEvents() {
     const host = this.host, p = this.ptr;
     const track = (e, down) => {
-      const r = host.getBoundingClientRect();
+      if (this.W < 2 || this.H < 2) return;
+      const r = this.frame();
       const now = performance.now() / 1e3;
       if (p.lt) {
         const d = Math.max(now - p.lt, 1 / 240);
@@ -862,6 +952,9 @@ var GasEngine = class {
       p.lt = 0;
       this.wake();
     });
+    const scrolled = () => this.wake();
+    window.addEventListener("scroll", scrolled, { capture: true, passive: true });
+    this.disposers.push(() => window.removeEventListener("scroll", scrolled, { capture: true }));
     const vis = () => {
       this.visible = !document.hidden;
       if (this.visible) this.wake();
@@ -902,6 +995,8 @@ function rgb(v, fallback) {
 var sceneCss = `
 :host{display:block;position:relative;isolation:isolate;overflow:hidden}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+:host([fixed]){overflow:visible}
+:host([fixed]) canvas{position:fixed}
 :host([backdrop="canvas"]) canvas{z-index:0}
 :host(:not([backdrop="canvas"])) canvas{z-index:1}
 .fail{position:absolute;inset:auto 8px 8px 8px;z-index:3;font:12px/1.5 system-ui,sans-serif;padding:6px 10px;border-radius:8px;background:rgba(0,0,0,.7);color:#fff}
@@ -914,6 +1009,9 @@ var AidScene = class extends HTMLElement {
     this.pending = [];
     this.tiltOn = false;
     this.error = "";
+    this.onWin = () => {
+      this.engine?.resize();
+    };
     this.onTilt = (e) => {
       if (!this.engine || e.gamma == null) return;
       const g = Math.max(-80, Math.min(80, e.gamma));
@@ -935,7 +1033,7 @@ var AidScene = class extends HTMLElement {
   connectedCallback() {
     if (this.engine || this.error) return;
     try {
-      this.engine = new GasEngine(this, this.canvas, this.backdrop !== "canvas");
+      this.engine = new GasEngine(this, this.canvas, this.backdrop !== "canvas", this.hasAttribute("fixed"));
       this.engine.onStats = (s) => this.dispatchEvent(new CustomEvent("aid-stats", { detail: s }));
     } catch (e) {
       this.error = e.message;
@@ -945,14 +1043,18 @@ var AidScene = class extends HTMLElement {
       this.shadowRoot.append(f);
       return;
     }
-    this.ro = new ResizeObserver(() => this.engine?.resize());
-    this.ro.observe(this);
+    if (this.hasAttribute("fixed")) window.addEventListener("resize", this.onWin);
+    else {
+      this.ro = new ResizeObserver(() => this.engine?.resize());
+      this.ro.observe(this);
+    }
     this.pending.splice(0).forEach((f) => f());
     if (document.fonts) document.fonts.ready.then(() => this.engine?.resize());
     if (this.getAttribute("tilt") === "device") this.listenTilt();
   }
   disconnectedCallback() {
     this.ro?.disconnect();
+    window.removeEventListener("resize", this.onWin);
     if (this.tiltOn) {
       window.removeEventListener("deviceorientation", this.onTilt);
       this.tiltOn = false;
@@ -1026,8 +1128,11 @@ var AidScene = class extends HTMLElement {
 
 // src/components/gas.ts
 var gasCss = `
-:host{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* container-level tokens are reset here so a container never inherits them from a container around it */
+:host{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;-webkit-tap-highlight-color:transparent;
+--aid-pressure:1;--aid-membrane:1;--aid-excitation:0;--aid-excitation-color:initial}
 :host([hidden]){display:none}
+:host([force=focus]){--aid-excitation:.6}
 :host::before{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;pointer-events:none;
 -webkit-backdrop-filter:var(--_aid-bf,none);backdrop-filter:var(--_aid-bf,none);
 --_aid-fade:calc(var(--_aid-fade-unit,9999px) / max(var(--aid-weight,.6),.02));
@@ -1037,14 +1142,37 @@ var gasCss = `
 -webkit-backdrop-filter:blur(calc(var(--aid-pressure,1) * 4px));backdrop-filter:blur(calc(var(--aid-pressure,1) * 4px));
 background:rgba(var(--aid-scene-light,246,248,251),.14);-webkit-clip-path:var(--_aid-veil-clip,none);clip-path:var(--_aid-veil-clip,none)}
 `;
+function findScene(el) {
+  let n = el;
+  while (n) {
+    const s = n.closest("aid-scene");
+    if (s) return s;
+    const root = n.getRootNode();
+    n = root instanceof ShadowRoot ? root.host : null;
+  }
+  return null;
+}
 var AidGas = class extends HTMLElement {
   constructor() {
     super();
     this.scene = null;
     this.pressed = false;
+    this.hovered = false;
     /* focus styles may change --aid-excitation; the engine re-reads tokens when it wakes */
     this.onFocus = () => {
       this.scene?.wake();
+    };
+    this.onEnter = (e) => {
+      if (e.pointerType === "mouse" && this.interactive() && !this.disabled) {
+        this.hovered = true;
+        this.scene?.wake();
+      }
+    };
+    this.onLeave = () => {
+      if (this.hovered) {
+        this.hovered = false;
+        this.scene?.wake();
+      }
     };
     this.onDown = () => {
       if (!this.interactive() || this.disabled) return;
@@ -1073,20 +1201,24 @@ var AidGas = class extends HTMLElement {
     return this;
   }
   connectedCallback() {
-    this.scene = this.closest("aid-scene");
+    this.scene = findScene(this);
     if (!this.scene) return;
     const attach = () => this.scene.whenReady(() => this.scene.engine.add(this));
     if (customElements.get("aid-scene")) attach();
     else customElements.whenDefined("aid-scene").then(attach);
     this.addEventListener("pointerdown", this.onDown);
     ["pointerup", "pointercancel", "pointerleave"].forEach((t) => this.addEventListener(t, this.onUp));
-    ["focus", "blur"].forEach((t) => this.addEventListener(t, this.onFocus));
+    ["focus", "blur", "focusin", "focusout"].forEach((t) => this.addEventListener(t, this.onFocus));
+    this.addEventListener("pointerenter", this.onEnter);
+    this.addEventListener("pointerleave", this.onLeave);
   }
   disconnectedCallback() {
     this.scene?.engine?.remove(this);
     this.removeEventListener("pointerdown", this.onDown);
     ["pointerup", "pointercancel", "pointerleave"].forEach((t) => this.removeEventListener(t, this.onUp));
-    ["focus", "blur"].forEach((t) => this.removeEventListener(t, this.onFocus));
+    ["focus", "blur", "focusin", "focusout"].forEach((t) => this.removeEventListener(t, this.onFocus));
+    this.removeEventListener("pointerenter", this.onEnter);
+    this.removeEventListener("pointerleave", this.onLeave);
   }
   attributeChangedCallback() {
     this.scene?.wake();
@@ -1100,6 +1232,10 @@ var AidGas = class extends HTMLElement {
   interactive() {
     return false;
   }
+  /** documentation aid: force="hover" | "pressed" | "focus" shows that state without interaction */
+  forced(s) {
+    return this.getAttribute("force") === s;
+  }
   /** briefly compress, for keyboard activation */
   pulse() {
     this.pressed = true;
@@ -1109,12 +1245,23 @@ var AidGas = class extends HTMLElement {
       this.scene?.wake();
     }, 180);
   }
+  /** rest 1, hover 1.1 (the gas gathers), pressed 1.25 (compressed), disabled 0 (evacuated) */
   stateFactor() {
     if (this.disabled) return 0;
-    return this.pressed ? 1.25 : 1;
+    if (this.pressed || this.forced("pressed")) return 1.25;
+    return this.hovered || this.forced("hover") ? 1.1 : 1;
   }
   dashed() {
     return this.disabled;
+  }
+  shell() {
+    return false;
+  }
+  busy() {
+    return false;
+  }
+  veilAll() {
+    return false;
   }
 };
 
@@ -1129,8 +1276,14 @@ var AidButton = class extends AidGas {
       this.click();
     };
   }
+  static get observedAttributes() {
+    return ["disabled", "loading", "variant", "size"];
+  }
   extraCss() {
-    return ":host{cursor:pointer;user-select:none;-webkit-user-select:none;font:inherit;color:inherit;min-height:44px;padding:0 20px;border-radius:999px}:host([disabled]){cursor:not-allowed;opacity:.6}:host(:focus-visible){outline:2px solid currentColor;outline-offset:4px;--aid-excitation:.6}";
+    return ":host{cursor:pointer;user-select:none;-webkit-user-select:none;font:inherit;font-weight:500;color:inherit;gap:8px;white-space:nowrap;min-height:var(--aid-size-md,44px);padding:0 20px;border-radius:999px}:host([size=sm]){min-height:var(--aid-size-sm,36px);padding:0 14px;font-size:.875em}:host([size=lg]){min-height:var(--aid-size-lg,52px);padding:0 26px;font-size:1.0625em}:host([icon]){padding:0;aspect-ratio:1;min-width:var(--aid-size-md,44px)}:host([icon][size=sm]){min-width:var(--aid-size-sm,36px)}:host([icon][size=lg]){min-width:var(--aid-size-lg,52px)}:host([variant=primary]){--aid-pressure:1.3;--aid-excitation:.5;font-weight:600}:host([variant=danger]){--aid-pressure:1.2;--aid-excitation:.5;--aid-excitation-color:var(--aid-danger,214,69,61)}:host([variant=quiet]){--aid-pressure:.2;--aid-membrane:.45}:host(:focus-visible),:host([force=focus]){outline:2px solid currentColor;outline-offset:3px;--aid-excitation:.8}:host([loading]){cursor:progress}:host([disabled]){cursor:not-allowed;opacity:.55;--aid-excitation:0}";
+  }
+  busy() {
+    return this.hasAttribute("loading") && !this.disabled;
   }
   connectedCallback() {
     super.connectedCallback();
@@ -1154,12 +1307,14 @@ var AidButton = class extends AidGas {
       this.removeAttribute("aria-disabled");
       this.tabIndex = 0;
     }
+    if (this.hasAttribute("loading")) this.setAttribute("aria-busy", "true");
+    else this.removeAttribute("aria-busy");
   }
   interactive() {
     return true;
   }
   click() {
-    if (this.disabled) return;
+    if (this.disabled || this.hasAttribute("loading")) return;
     super.click();
   }
 };
@@ -1259,10 +1414,533 @@ var AidTab = class extends AidGas {
   }
 };
 
+// src/components/form.ts
+var CHECK = '<svg class="on" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+var DASH = '<svg class="mid" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>';
+var DOT = '<svg class="on" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" style="fill:currentColor;stroke:none"/></svg>';
+var MARK_CSS = "svg{position:absolute;inset:0;margin:auto;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity .12s}:host([checked]:not([indeterminate])) svg.on,:host([indeterminate]) svg.mid{opacity:1}";
+var FOCUS = ":host(:focus-visible),:host([force=focus]){outline:2px solid currentColor;outline-offset:3px;--aid-excitation:.8}";
+var OFF = ":host([disabled]){cursor:not-allowed;opacity:.55;--aid-excitation:0}";
+function bindLabel(el, toggle) {
+  const label = el.closest("label");
+  if (!label) return () => void 0;
+  if (!el.hasAttribute("aria-label") && !el.hasAttribute("aria-labelledby")) {
+    if (!label.id) label.id = "aid-l" + Math.random().toString(36).slice(2, 8);
+    el.setAttribute("aria-labelledby", label.id);
+  }
+  const f = (e) => {
+    if (!el.contains(e.target)) toggle();
+  };
+  label.addEventListener("click", f);
+  return () => label.removeEventListener("click", f);
+}
+var AidToggle = class extends AidGas {
+  constructor() {
+    super(...arguments);
+    this.unbind = () => void 0;
+    this.onClick = () => this.toggle();
+    this.onKey = (e) => {
+      if (e.key !== " " && e.key !== "Enter") return;
+      e.preventDefault();
+      this.pulse();
+      this.toggle();
+    };
+  }
+  static get observedAttributes() {
+    return ["disabled", "checked", "indeterminate"];
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.setAttribute("role", this.kind);
+    this.sync();
+    this.addEventListener("click", this.onClick);
+    this.addEventListener("keydown", this.onKey);
+    this.unbind = bindLabel(this, () => this.toggle());
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.removeEventListener("click", this.onClick);
+    this.removeEventListener("keydown", this.onKey);
+    this.unbind();
+  }
+  attributeChangedCallback() {
+    this.sync();
+    super.attributeChangedCallback();
+  }
+  get checked() {
+    return this.hasAttribute("checked");
+  }
+  set checked(v) {
+    this.toggleAttribute("checked", v);
+  }
+  sync() {
+    this.setAttribute("aria-checked", this.hasAttribute("indeterminate") ? "mixed" : String(this.checked));
+    if (this.disabled) {
+      this.setAttribute("aria-disabled", "true");
+      this.tabIndex = -1;
+    } else {
+      this.removeAttribute("aria-disabled");
+      if (this.tabIndex < 0 || !this.hasAttribute("tabindex")) this.tabIndex = 0;
+    }
+  }
+  interactive() {
+    return true;
+  }
+  shell() {
+    return true;
+  }
+  /** user-initiated change */
+  toggle() {
+    if (this.disabled) return;
+    this.removeAttribute("indeterminate");
+    this.checked = !this.checked;
+    this.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  /** an unchecked chamber is empty; hovering lets a little gas in; checked is a full, dense chamber */
+  stateFactor() {
+    if (this.disabled) return 0;
+    const on = this.checked || this.hasAttribute("indeterminate");
+    const k = this.pressed || this.forced("pressed") ? 1.25 : this.hovered || this.forced("hover") ? 1.1 : 1;
+    return on ? 1.7 * k : k > 1 ? 0.35 : 0;
+  }
+};
+var AidCheckbox = class extends AidToggle {
+  constructor() {
+    super();
+    this.kind = "checkbox";
+    this.shadowRoot.querySelector("slot").insertAdjacentHTML("afterend", CHECK + DASH);
+  }
+  extraCss() {
+    return ":host{width:22px;height:22px;border-radius:7px;cursor:pointer;flex:none;color:inherit;--aid-weight:.15}:host([checked]),:host([indeterminate]){--aid-excitation:.45}" + FOCUS + OFF + MARK_CSS;
+  }
+};
+var AidRadio = class extends AidToggle {
+  constructor() {
+    super();
+    this.kind = "radio";
+    this.onKey = (e) => {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        this.pulse();
+        this.toggle();
+        return;
+      }
+      const rtl = getComputedStyle(this).direction === "rtl";
+      const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : e.key === "ArrowRight" ? rtl ? -1 : 1 : e.key === "ArrowLeft" ? rtl ? 1 : -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      const g = this.group().filter((r) => !r.disabled), n = g[(g.indexOf(this) + step + g.length) % g.length];
+      n.focus();
+      n.toggle();
+    };
+    this.shadowRoot.querySelector("slot").insertAdjacentHTML("afterend", DOT);
+  }
+  extraCss() {
+    return ":host{width:22px;height:22px;border-radius:50%;cursor:pointer;flex:none;color:inherit;--aid-weight:.15}:host([checked]){--aid-excitation:.45}" + FOCUS + OFF + MARK_CSS;
+  }
+  group() {
+    const name = this.getAttribute("name");
+    if (!name) return [this];
+    return Array.from(this.getRootNode().querySelectorAll(`aid-radio[name="${CSS.escape(name)}"]`));
+  }
+  sync() {
+    super.sync();
+    if (this.disabled || !this.isConnected) return;
+    const g = this.group().filter((r) => !r.disabled), cur = g.find((r) => r.checked) || g[0];
+    for (const r of g) r.tabIndex = r === cur ? 0 : -1;
+  }
+  toggle() {
+    if (this.disabled || this.checked) return;
+    for (const r of this.group()) if (r !== this) r.checked = false;
+    this.checked = true;
+    this.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+};
+var AidSwitch = class extends AidToggle {
+  constructor() {
+    super();
+    this.kind = "switch";
+    this.thumb = null;
+    this.shadowRoot.querySelector("slot").insertAdjacentHTML("afterend", '<aid-gas class="thumb"></aid-gas>');
+  }
+  extraCss() {
+    return ":host{width:48px;height:28px;border-radius:14px;padding:3px;cursor:pointer;flex:none;justify-content:flex-start;--aid-pressure:.2;--aid-weight:0}:host([checked]){--aid-pressure:.9;--aid-excitation:.5}.thumb{width:22px;height:22px;border-radius:50%;pointer-events:none;--aid-pressure:.8;--aid-weight:.1;transition:margin-inline-start .16s ease;background:color-mix(in srgb,var(--aid-color-surface,#fff) 78%,transparent);box-shadow:0 1px 2px rgba(0,0,0,.2)}:host([checked]) .thumb{margin-inline-start:20px;--aid-pressure:2}@media (prefers-reduced-motion:reduce){.thumb{transition:none}}" + FOCUS + OFF;
+  }
+  sync() {
+    super.sync();
+    this.thumb = this.thumb || this.shadowRoot.querySelector(".thumb");
+    if (this.thumb) this.thumb.toggleAttribute("disabled", this.disabled);
+  }
+  stateFactor() {
+    if (this.disabled) return 0;
+    return this.pressed || this.forced("pressed") ? 1.25 : this.hovered || this.forced("hover") ? 1.1 : 1;
+  }
+};
+var AidChip = class extends AidGas {
+  constructor() {
+    super(...arguments);
+    this.onClick = () => {
+      if (this.disabled) return;
+      this.selected = !this.selected;
+      this.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    this.onKey = (e) => {
+      if (this.disabled || e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      this.pulse();
+      this.onClick();
+    };
+  }
+  static get observedAttributes() {
+    return ["disabled", "selected"];
+  }
+  extraCss() {
+    return ":host{cursor:pointer;user-select:none;-webkit-user-select:none;font:inherit;font-size:.8125em;font-weight:500;color:inherit;gap:6px;white-space:nowrap;min-height:32px;padding:0 14px;border-radius:999px;--aid-weight:.3}:host([static]){cursor:default}" + FOCUS + OFF;
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    if (!this.hasAttribute("static")) {
+      this.setAttribute("role", "button");
+      this.addEventListener("click", this.onClick);
+      this.addEventListener("keydown", this.onKey);
+    }
+    this.sync();
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.removeEventListener("click", this.onClick);
+    this.removeEventListener("keydown", this.onKey);
+  }
+  attributeChangedCallback() {
+    this.sync();
+    super.attributeChangedCallback();
+  }
+  get selected() {
+    return this.hasAttribute("selected");
+  }
+  set selected(v) {
+    this.toggleAttribute("selected", v);
+  }
+  sync() {
+    if (this.hasAttribute("static")) return;
+    this.setAttribute("aria-pressed", String(this.selected));
+    this.tabIndex = this.disabled ? -1 : 0;
+    if (this.disabled) this.setAttribute("aria-disabled", "true");
+    else this.removeAttribute("aria-disabled");
+  }
+  interactive() {
+    return !this.hasAttribute("static");
+  }
+  shell() {
+    return true;
+  }
+  stateFactor() {
+    if (this.disabled) return 0;
+    const k = this.pressed || this.forced("pressed") ? 1.25 : this.hovered || this.forced("hover") ? 1.1 : 1;
+    return (this.selected || this.hasAttribute("static") ? 1.1 : 0.22) * k;
+  }
+};
+var AidField = class extends AidGas {
+  constructor() {
+    super(...arguments);
+    this.mo = null;
+    this.onClick = (e) => {
+      const c = this.control;
+      if (c && e.target !== c && !c.disabled) c.focus();
+    };
+  }
+  static get observedAttributes() {
+    return ["disabled", "invalid"];
+  }
+  extraCss() {
+    return ":host{display:flex;gap:8px;width:100%;min-height:var(--aid-size-md,44px);padding:0 14px;border-radius:var(--aid-radius-md,14px);cursor:text;font:inherit;color:inherit;--aid-pressure:.7;--aid-weight:.35}::slotted(input),::slotted(textarea),::slotted(select){flex:1;min-width:0;align-self:stretch;font:inherit;color:inherit;background:transparent;border:0;outline:0;padding:0;margin:0;-webkit-appearance:none;appearance:none}::slotted(textarea){padding:11px 0;min-height:88px;resize:vertical}:host(:focus-within),:host([force=focus]){--aid-excitation:.55;outline:2px solid color-mix(in srgb,currentColor 60%,transparent);outline-offset:2px}:host([invalid]){--aid-excitation:.6;--aid-excitation-color:var(--aid-danger,214,69,61)}" + OFF;
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.addEventListener("click", this.onClick);
+    this.mo = new MutationObserver(() => this.mirror());
+    this.mo.observe(this, { subtree: true, childList: true, attributes: true, attributeFilter: ["disabled", "aria-invalid"] });
+    this.mirror();
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.removeEventListener("click", this.onClick);
+    this.mo?.disconnect();
+  }
+  get control() {
+    return this.querySelector("input,textarea,select");
+  }
+  mirror() {
+    const c = this.control;
+    if (!c) return;
+    if (c.disabled !== this.disabled) this.toggleAttribute("disabled", c.disabled);
+    const bad = c.getAttribute("aria-invalid") === "true";
+    if (c.hasAttribute("aria-invalid") && bad !== this.hasAttribute("invalid")) this.toggleAttribute("invalid", bad);
+  }
+  interactive() {
+    return true;
+  }
+  stateFactor() {
+    if (this.disabled) return 0;
+    if (this.matches(":focus-within") || this.forced("focus")) return 1.2;
+    return this.hovered || this.forced("hover") ? 1.1 : 1;
+  }
+};
+var AidCard = class extends AidGas {
+  extraCss() {
+    return ":host{display:block;border-radius:var(--aid-radius-lg,20px);padding:var(--aid-space-4,16px);color:inherit;--aid-pressure:.3;--aid-weight:.5}:host([interactive]){cursor:pointer}";
+  }
+  interactive() {
+    return this.hasAttribute("interactive");
+  }
+};
+var AidProgress = class extends AidGas {
+  static get observedAttributes() {
+    return ["value", "disabled"];
+  }
+  extraCss() {
+    return ":host{display:flex;justify-content:flex-start;width:100%;height:12px;border-radius:6px;--aid-pressure:.12;--aid-weight:0}.bar{height:100%;min-width:0;width:var(--_v,38%);border-radius:6px;--aid-pressure:2;--aid-weight:0;--aid-excitation:.55;--aid-membrane:0;transition:width .25s ease}:host(:not([value])) .bar{animation:aid-ind 2.4s ease-in-out infinite}@keyframes aid-ind{0%,100%{margin-inline-start:0}50%{margin-inline-start:62%}}@media (prefers-reduced-motion:reduce){.bar{transition:none}:host(:not([value])) .bar{animation:none;margin-inline-start:31%}}";
+  }
+  constructor() {
+    super();
+    this.shadowRoot.querySelector("slot").insertAdjacentHTML("afterend", '<aid-gas class="bar"></aid-gas>');
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.setAttribute("role", "progressbar");
+    this.sync();
+  }
+  attributeChangedCallback() {
+    this.sync();
+    super.attributeChangedCallback();
+  }
+  shell() {
+    return true;
+  }
+  sync() {
+    const v = this.getAttribute("value");
+    if (v === null) {
+      this.style.removeProperty("--_v");
+      this.removeAttribute("aria-valuenow");
+      return;
+    }
+    const n = Math.max(0, Math.min(100, parseFloat(v) || 0));
+    this.style.setProperty("--_v", n + "%");
+    this.setAttribute("aria-valuemin", "0");
+    this.setAttribute("aria-valuemax", "100");
+    this.setAttribute("aria-valuenow", String(n));
+  }
+};
+var AidDialog = class extends AidGas {
+  constructor() {
+    super();
+    this.back = null;
+    /* only a click on the fog itself closes; the panel lives in the shadow tree, so the event target alone cannot tell */
+    this.onClick = (e) => {
+      if (e.composedPath()[0] === this && !this.hasAttribute("persistent")) this.close();
+    };
+    this.onKey = (e) => {
+      if (e.key === "Escape" && !this.hasAttribute("persistent")) {
+        e.preventDefault();
+        this.close();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const f = this.focusables();
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1], cur = document.activeElement;
+      if (e.shiftKey && cur === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && cur === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    const slot = this.shadowRoot.querySelector("slot");
+    const panel = document.createElement("aid-gas");
+    panel.className = "panel";
+    panel.setAttribute("part", "panel");
+    slot.replaceWith(panel);
+    panel.append(slot);
+  }
+  static get observedAttributes() {
+    return ["open"];
+  }
+  extraCss() {
+    return ":host{display:none;position:absolute;inset:0;z-index:1000;padding:16px;border-radius:0;--aid-pressure:.5;--aid-weight:0;--aid-membrane:0}:host([open]){display:flex}.panel{display:block;width:min(100%,420px);max-height:100%;overflow:auto;border-radius:var(--aid-radius-xl,24px);padding:20px;color:inherit;--aid-pressure:1;--aid-weight:.2}";
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.setAttribute("role", "dialog");
+    this.setAttribute("aria-modal", "true");
+    if (this.scene?.hasAttribute("fixed")) this.style.position = "fixed";
+    this.addEventListener("click", this.onClick);
+    this.addEventListener("keydown", this.onKey);
+    if (this.open) this.enter();
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.removeEventListener("click", this.onClick);
+    this.removeEventListener("keydown", this.onKey);
+  }
+  attributeChangedCallback(name) {
+    if (name === "open" && this.isConnected) {
+      if (this.open) this.enter();
+      else this.leave();
+    }
+    super.attributeChangedCallback();
+  }
+  get open() {
+    return this.hasAttribute("open");
+  }
+  set open(v) {
+    this.toggleAttribute("open", v);
+  }
+  show() {
+    this.open = true;
+  }
+  close() {
+    if (!this.open) return;
+    this.open = false;
+    this.dispatchEvent(new Event("close"));
+  }
+  veilAll() {
+    return true;
+  }
+  focusables() {
+    return Array.from(this.querySelectorAll("aid-button,aid-chip,aid-checkbox,aid-radio,aid-switch,aid-tab,input,textarea,select,button,a[href],[tabindex]")).filter((e) => !e.hasAttribute("disabled") && e.tabIndex >= 0);
+  }
+  enter() {
+    this.back = document.activeElement;
+    queueMicrotask(() => {
+      const f = this.focusables()[0];
+      if (f) f.focus();
+    });
+  }
+  leave() {
+    if (this.back instanceof HTMLElement) this.back.focus();
+    this.back = null;
+  }
+  stateFactor() {
+    return this.open ? 1 : 0;
+  }
+};
+
+// src/components/icon.ts
+var ICONS = {
+  plus: "M12 5v14M5 12h14",
+  minus: "M5 12h14",
+  close: "M6 6l12 12M18 6L6 18",
+  check: "M5 12.5l4.5 4.5L19 7.5",
+  "chevron-right": "M9 5l7 7-7 7",
+  "chevron-left": "M15 5l-7 7 7 7",
+  "chevron-down": "M5 9l7 7 7-7",
+  "chevron-up": "M5 15l7-7 7 7",
+  "arrow-right": "M5 12h14M13 6l6 6-6 6",
+  "arrow-left": "M19 12H5M11 6l-6 6 6 6",
+  search: "M4 11a7 7 0 1 0 14 0a7 7 0 1 0-14 0M20 20l-4-4",
+  home: "M4 11l8-7 8 7M6 10v9h12v-9M10 19v-5h4v5",
+  file: "M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6",
+  chart: "M4 20h16M7 20v-7M12 20V5M17 20V10",
+  user: "M8 8a4 4 0 1 0 8 0a4 4 0 1 0-8 0M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5",
+  settings: "M4 7h10M18 7h2M4 17h2M10 17h10M16 4.5v5M8 14.5v5",
+  bell: "M6 16v-5a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0",
+  edit: "M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4",
+  trash: "M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6",
+  download: "M12 4v11M7 10l5 5 5-5M5 20h14",
+  upload: "M12 15V4M7 9l5-5 5 5M5 20h14",
+  filter: "M4 5h16l-6 8v6l-4-2v-4z",
+  calendar: "M5 6h14v14H5zM5 10h14M9 3v5M15 3v5",
+  info: "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 11v5.5M12 7.6v.4",
+  warning: "M12 4l9.5 16h-19zM12 10v4.5M12 17v.4",
+  error: "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M9 9l6 6M15 9l-6 6",
+  success: "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M8 12.5l3 3 5-6",
+  eye: "M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12zM9.5 12a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0",
+  menu: "M4 7h16M4 12h16M4 17h16",
+  more: "M6 12h.01M12 12h.01M18 12h.01",
+  lock: "M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z",
+  heart: "M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z",
+  star: "M12 4l2.5 5.2 5.7.8-4.1 4 1 5.7L12 17l-5.1 2.7 1-5.7-4.1-4 5.7-.8z",
+  send: "M4 12l16-8-6 16-3-6.5z",
+  copy: "M9 9h11v11H9zM5 15V4h11",
+  refresh: "M19 6v5h-5M5 18v-5h5M18.4 11A7 7 0 0 0 6 8.5M5.6 13A7 7 0 0 0 18 15.5"
+};
+var DIRECTIONAL = /* @__PURE__ */ new Set(["chevron-right", "chevron-left", "arrow-right", "arrow-left", "send"]);
+var css = `:host{display:inline-flex;flex:none;width:1.25em;height:1.25em;vertical-align:-.2em;color:inherit}
+svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+:host([name="more"]) svg{stroke-width:2.6}
+:host([data-flip]) svg{transform:scaleX(-1)}`;
+var AidIcon = class extends HTMLElement {
+  static get observedAttributes() {
+    return ["name", "label", "size"];
+  }
+  constructor() {
+    super();
+    const root = this.attachShadow({ mode: "open" });
+    const s = document.createElement("style");
+    s.textContent = css;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    this.path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    svg.append(this.path);
+    root.append(s, svg);
+  }
+  connectedCallback() {
+    this.sync();
+  }
+  attributeChangedCallback() {
+    this.sync();
+  }
+  sync() {
+    const name = this.getAttribute("name") || "";
+    this.path.setAttribute("d", ICONS[name] || "");
+    const size = this.getAttribute("size");
+    if (size) {
+      this.style.width = this.style.height = /^\d+$/.test(size) ? size + "px" : size;
+    }
+    const label = this.getAttribute("label");
+    if (label) {
+      this.setAttribute("role", "img");
+      this.setAttribute("aria-label", label);
+      this.removeAttribute("aria-hidden");
+    } else {
+      this.removeAttribute("role");
+      this.setAttribute("aria-hidden", "true");
+    }
+    const rtl = this.isConnected && getComputedStyle(this).direction === "rtl";
+    this.toggleAttribute("data-flip", rtl && DIRECTIONAL.has(name) && !this.hasAttribute("fixed"));
+  }
+  /** re-check the text direction (call after changing `dir` on an ancestor) */
+  refresh() {
+    this.sync();
+  }
+};
+
+// src/core/tokens.ts
+var LIGHT = `--aid-color-bg:#EEF0F3;--aid-color-surface:#FAFBFC;--aid-color-ink:#13171B;--aid-color-ink-muted:#56606B;--aid-color-line:#D5DAE0;
+--aid-danger:214,69,61;--aid-success:38,160,105;--aid-warning:224,150,24;--aid-info:56,128,232;
+--aid-scene-light:246,248,251;--aid-membrane-color:24,34,52;--aid-membrane-alpha:.14;color-scheme:light`;
+var DARK = `--aid-color-bg:#0B0E11;--aid-color-surface:#12171C;--aid-color-ink:#E8ECF0;--aid-color-ink-muted:#97A3AE;--aid-color-line:#252C33;
+--aid-danger:240,100,90;--aid-success:70,200,140;--aid-warning:240,180,70;--aid-info:110,165,245;
+--aid-scene-light:150,162,182;--aid-membrane-color:225,232,240;--aid-membrane-alpha:.14;color-scheme:dark`;
+var TOKENS_CSS = `
+:where(:root){
+--aid-font:"Inter","Vazirmatn",system-ui,-apple-system,"Segoe UI",sans-serif;
+--aid-text-xs:12px;--aid-text-sm:14px;--aid-text-md:16px;--aid-text-lg:20px;--aid-text-xl:24px;--aid-text-2xl:32px;
+--aid-space-1:4px;--aid-space-2:8px;--aid-space-3:12px;--aid-space-4:16px;--aid-space-5:24px;--aid-space-6:32px;--aid-space-7:48px;
+--aid-radius-sm:8px;--aid-radius-md:14px;--aid-radius-lg:20px;--aid-radius-xl:24px;--aid-radius-pill:999px;
+--aid-size-sm:36px;--aid-size-md:44px;--aid-size-lg:52px;
+${LIGHT}}
+@media (prefers-color-scheme:dark){:where(:root){${DARK}}}
+:where([data-aid-theme="light"]){${LIGHT}}
+:where([data-aid-theme="dark"]){${DARK}}
+`;
+
 // src/index.ts
 var GLOBAL_CSS = `
-aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs){--_aid-bf:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92)}
-aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs)[disabled]{--_aid-bf:none}
+aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-dialog,aid-switch,aid-checkbox,aid-radio){--_aid-bf:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92)}
+aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio)[disabled]{--_aid-bf:none}
 aid-scene:not([backdrop="canvas"]) aid-tab{--_aid-bf:none}
 `;
 function define() {
@@ -1270,7 +1948,7 @@ function define() {
   if (!document.getElementById("aid-global-css")) {
     const s = document.createElement("style");
     s.id = "aid-global-css";
-    s.textContent = GLOBAL_CSS;
+    s.textContent = TOKENS_CSS + GLOBAL_CSS;
     document.head.append(s);
   }
   const reg = [
@@ -1278,7 +1956,16 @@ function define() {
     ["aid-gas", AidGas],
     ["aid-button", AidButton],
     ["aid-tabs", AidTabs],
-    ["aid-tab", AidTab]
+    ["aid-tab", AidTab],
+    ["aid-checkbox", AidCheckbox],
+    ["aid-radio", AidRadio],
+    ["aid-switch", AidSwitch],
+    ["aid-chip", AidChip],
+    ["aid-field", AidField],
+    ["aid-card", AidCard],
+    ["aid-progress", AidProgress],
+    ["aid-dialog", AidDialog],
+    ["aid-icon", AidIcon]
   ];
   for (const [name, ctor] of reg) if (!customElements.get(name)) customElements.define(name, ctor);
 }
@@ -1287,15 +1974,26 @@ export {
   AIR_MOLAR_MASS,
   AIR_REFRACTIVITY,
   AidButton,
+  AidCard,
+  AidCheckbox,
+  AidChip,
+  AidDialog,
+  AidField,
   AidGas,
+  AidIcon,
+  AidProgress,
+  AidRadio,
   AidScene,
+  AidSwitch,
   AidTab,
   AidTabs,
   CONTAINER_DEFAULTS,
   GASES,
   GasEngine,
+  ICONS,
   SCENE_DEFAULTS,
   TIERS,
+  TOKENS_CSS,
   albedo,
   buoyancy,
   chooseTier,

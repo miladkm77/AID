@@ -1,10 +1,19 @@
 import { AidGas } from './gas';
 /**
  * <aid-button> — a gas container that behaves as a button.
- * Activates on click, Enter and Space; fires a regular 'click'. Disabled = evacuated container, dashed wall.
+ * Activates on click, Enter and Space; fires a regular 'click'.
+ *
+ *   variant  default | "primary" (excited gas, the accent of the scene's species) | "danger" | "quiet" (almost empty)
+ *   size     "sm" | default | "lg"          icon   icon-only, square
+ *   loading  the excitation pulses and clicks are ignored
+ *
+ * States: rest · hover (the gas gathers, ×1.1) · pressed (compressed, ×1.25) · focus (excited) ·
+ *         loading (pulsing) · disabled (evacuated, dashed wall).
  */
 export declare class AidButton extends AidGas {
+    static get observedAttributes(): string[];
     protected extraCss(): string;
+    busy(): boolean;
     connectedCallback(): void;
     disconnectedCallback(): void;
     attributeChangedCallback(): void;

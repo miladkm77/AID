@@ -7,6 +7,9 @@ import { GasEngine, EngineStats } from '../engine/engine';
  * backdrop="canvas": the content behind is a canvas or image you hand over with setBackdrop(). Full model:
  *   refraction, scattering of the content's own light, absorption.
  *
+ * fixed: for a whole app or page. The canvas covers the viewport instead of the scene's box, so one scene (one GPU
+ *   context) serves every container on a scrolling page. Only containers in view are simulated.
+ *
  * tilt="device": gravity follows the device, so a heavy gas slides to the low side when the phone is tilted.
  *   Browsers that ask for permission (iOS) need enableDeviceTilt() to be called from a tap.
  */
@@ -22,6 +25,7 @@ export declare class AidScene extends HTMLElement {
     connectedCallback(): void;
     disconnectedCallback(): void;
     attributeChangedCallback(name: string): void;
+    private onWin;
     private onTilt;
     private listenTilt;
     /** Ask for motion access where the browser requires it (call from a tap), then follow the device. Resolves to whether it is on. */

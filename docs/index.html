@@ -22,7 +22,7 @@ a{color:var(--accent)}
 .eyebrow{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 h1{font-size:clamp(40px,8vw,92px);line-height:1;letter-spacing:-.035em;margin:10px 0 18px;font-weight:800}
 .lead{font-size:clamp(16px,2vw,20px);color:var(--muted);max-width:46ch;margin:0}
-.cta{position:absolute;left:clamp(20px,6vw,72px);top:clamp(330px,52vh,430px);display:flex;gap:12px;z-index:2}
+.cta{position:absolute;left:clamp(20px,6vw,72px);top:clamp(330px,52vh,430px);display:flex;flex-wrap:wrap;gap:12px;z-index:2;max-width:calc(100% - 40px)}
 .cta aid-button{height:52px;padding:0 26px;font-weight:600;font-size:15px}
 .gases{position:absolute;left:50%;transform:translateX(-50%);bottom:max(22px,env(safe-area-inset-bottom,0px));width:min(440px,calc(100% - 28px));height:64px;font-weight:600;font-size:13px;color:var(--muted);z-index:2}
 .gases aid-tab[selected]{color:var(--fg)}
@@ -48,6 +48,7 @@ footer{border-top:1px solid var(--line);padding:24px 20px;text-align:center;colo
   </div>
   <div class="cta">
     <aid-button id="goLab">Open the lab</aid-button>
+    <aid-button id="goSys">Design system</aid-button>
     <aid-button id="goGit">GitHub</aid-button>
   </div>
   <div class="gname" id="gname">xenon · heavy, pools, the default</div>
@@ -97,7 +98,7 @@ footer{border-top:1px solid var(--line);padding:24px 20px;text-align:center;colo
     <p style="color:var(--muted)">Parameters are CSS custom properties: <code>--aid-gas</code>, <code>--aid-pressure</code>, <code>--aid-agitation</code>, <code>--aid-refraction</code>, <code>--aid-weight</code>, <code>--aid-tilt</code>, <code>--aid-light-reach</code>, <code>--aid-glow</code>, <code>--aid-excitation</code>, <code>--aid-smoke</code>, <code>--aid-spectral</code>. MIT licensed. Version 0.2: not yet measured on real devices.</p>
   </section>
 </main>
-<footer>AID · MIT © Milad Karami Motlaq · <a href="https://github.com/miladkm77/aid">github.com/miladkm77/aid</a> · <a href="lab.html">Lab</a></footer>
+<footer>AID · MIT © Milad Karami Motlaq · <a href="https://github.com/miladkm77/aid">github.com/miladkm77/aid</a> · <a href="system.html">Design system</a> · <a href="lab.html">Lab</a></footer>
 
 <script type="module">
 import './aid.js';
@@ -126,6 +127,7 @@ document.getElementById('gases').addEventListener('change',e=>{
   document.getElementById('gname').textContent=note[g];hero.wake?.();
 });
 document.getElementById('goLab').addEventListener('click',()=>location.href='lab.html');
+document.getElementById('goSys').addEventListener('click',()=>location.href='system.html');
 document.getElementById('goGit').addEventListener('click',()=>location.href='https://github.com/miladkm77/aid');
 </script>
 </body>

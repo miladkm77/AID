@@ -3,6 +3,8 @@ import { GasEngine, EngineStats, View } from '../engine/engine';
 const sceneCss = `
 :host{display:block;position:relative;isolation:isolate;overflow:hidden}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+:host([fixed]){overflow:visible}
+:host([fixed]) canvas{position:fixed}
 :host([backdrop="canvas"]) canvas{z-index:0}
 :host(:not([backdrop="canvas"])) canvas{z-index:1}
 .fail{position:absolute;inset:auto 8px 8px 8px;z-index:3;font:12px/1.5 system-ui,sans-serif;padding:6px 10px;border-radius:8px;background:rgba(0,0,0,.7);color:#fff}
@@ -15,6 +17,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-ev
  *   only the gas over it; the containers use a CSS backdrop blur as an approximation of scattering.
  * backdrop="canvas": the content behind is a canvas or image you hand over with setBackdrop(). Full model:
  *   refraction, scattering of the content's own light, absorption.
+ *
+ * fixed: for a whole app or page. The canvas covers the viewport instead of the scene's box, so one scene (one GPU
+ *   context) serves every container on a scrolling page. Only containers in view are simulated.
  *
  * tilt="device": gravity follows the device, so a heavy gas slides to the low side when the phone is tilted.
  *   Browsers that ask for permission (iOS) need enableDeviceTilt() to be called from a tap.
@@ -43,7 +48,7 @@ export class AidScene extends HTMLElement {
   connectedCallback(): void {
     if (this.engine || this.error) return;
     try {
-      this.engine = new GasEngine(this, this.canvas, this.backdrop !== 'canvas');
+      this.engine = new GasEngine(this, this.canvas, this.backdrop !== 'canvas', this.hasAttribute('fixed'));
       this.engine.onStats = (s: EngineStats) => this.dispatchEvent(new CustomEvent<EngineStats>('aid-stats', { detail: s }));
     } catch (e) {
       this.error = (e as Error).message;
@@ -53,8 +58,8 @@ export class AidScene extends HTMLElement {
       this.shadowRoot!.append(f);
       return;
     }
-    this.ro = new ResizeObserver(() => this.engine?.resize());
-    this.ro.observe(this);
+    if (this.hasAttribute('fixed')) window.addEventListener('resize', this.onWin);
+    else { this.ro = new ResizeObserver(() => this.engine?.resize()); this.ro.observe(this); }
     this.pending.splice(0).forEach((f) => f());
     if (document.fonts) document.fonts.ready.then(() => this.engine?.resize());
     if (this.getAttribute('tilt') === 'device') this.listenTilt();
@@ -62,6 +67,7 @@ export class AidScene extends HTMLElement {
 
   disconnectedCallback(): void {
     this.ro?.disconnect();
+    window.removeEventListener('resize', this.onWin);
     if (this.tiltOn) { window.removeEventListener('deviceorientation', this.onTilt); this.tiltOn = false; }
     this.engine?.dispose();
     this.engine = null;
@@ -71,6 +77,8 @@ export class AidScene extends HTMLElement {
     if (name === 'view' && this.engine) { this.engine.view = (this.getAttribute('view') as View) || 'final'; this.engine.render(); }
     if (name === 'tilt' && this.engine && this.getAttribute('tilt') === 'device') this.listenTilt();
   }
+
+  private onWin = (): void => { this.engine?.resize(); };
 
   private onTilt = (e: DeviceOrientationEvent): void => {
     if (!this.engine || e.gamma == null) return;

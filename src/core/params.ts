@@ -22,6 +22,7 @@ import { GasId, parseGas, DEFAULT_GAS } from './gases';
  *   --aid-membrane       0..1   visibility of the container wall
  *   --aid-profile        0..1   softness of the gas at the wall (0 = filled to the wall)
  *   --aid-excitation     0..1   glow discharge: the gas emits the colour of its species
+ *   --aid-excitation-color r,g,b  overrides that colour for a semantic state (danger, success); artistic
  */
 export type Quality = 'auto' | 'static' | 'efficient' | 'high';
 
@@ -44,6 +45,8 @@ export interface ContainerParams {
   profile: number;
   excitation: number;
   weight: number;
+  /** colour of the excited gas as r,g,b 0..255; null = the discharge colour of the gas */
+  excitationColor: number[] | null;
 }
 
 export const SCENE_DEFAULTS: SceneParams = {
@@ -59,7 +62,7 @@ export const SCENE_DEFAULTS: SceneParams = {
   quality: 'auto',
 };
 
-export const CONTAINER_DEFAULTS: ContainerParams = { pressure: 1, membrane: 1, profile: 0.2, excitation: 0, weight: 0.6 };
+export const CONTAINER_DEFAULTS: ContainerParams = { pressure: 1, membrane: 1, profile: 0.2, excitation: 0, weight: 0.6, excitationColor: null };
 
 function num(cs: CSSStyleDeclaration, name: string, fallback: number, lo: number, hi: number): number {
   const raw = cs.getPropertyValue(name).trim();
@@ -94,6 +97,7 @@ export function readContainerParams(el: Element): ContainerParams {
     profile: num(cs, '--aid-profile', CONTAINER_DEFAULTS.profile, 0, 1),
     excitation: num(cs, '--aid-excitation', CONTAINER_DEFAULTS.excitation, 0, 1),
     weight: num(cs, '--aid-weight', CONTAINER_DEFAULTS.weight, 0, 1),
+    excitationColor: triple(cs.getPropertyValue('--aid-excitation-color')),
   };
 }
 
@@ -109,4 +113,9 @@ export function kelvin(temperature01: number): number {
 /** Single-scattering albedo: smoke absorbs part of what it scatters. */
 export function albedo(smoke: number): number {
   return 1 - 0.42 * smoke;
+}
+
+function triple(v: string): number[] | null {
+  const p = v.split(',').map((x) => parseFloat(x));
+  return p.length >= 3 && p.slice(0, 3).every((x) => isFinite(x)) ? p.slice(0, 3) : null;
 }

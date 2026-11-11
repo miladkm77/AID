@@ -70,9 +70,38 @@ aid-scene { --aid-gas: xenon;        /* helium | neon | argon | krypton | xenon 
 
 The full list, the physical model and the label of every behaviour are in [SPEC.md](SPEC.md).
 
-## Components
+## Design system
 
-`<aid-scene>`, `<aid-gas>`, `<aid-button>`, `<aid-tabs>`, `<aid-tab>`. Buttons respond to Enter and Space, tabs to the arrow keys (right-to-left aware), and `prefers-reduced-motion` selects the static tier. `<aid-scene tilt="device">` lets gravity follow the device.
+**[Every component in every state](https://miladkm77.github.io/aid/system.html)** · light and dark · left-to-right and right-to-left.
+
+| Component | What it is | States |
+|---|---|---|
+| `<aid-button>` | `variant` default, primary, danger, quiet · `size` sm, md, lg · `icon` · `loading` | rest, hover, pressed, focus, loading, disabled |
+| `<aid-chip>` | a toggle for filters and tags | unselected, selected, hover, focus, disabled, static |
+| `<aid-field>` | the chamber around a native `input`, `textarea` or `select` | rest, hover, focus, invalid, disabled |
+| `<aid-checkbox>` `<aid-radio>` `<aid-switch>` | selection controls; work inside a `<label>` | off, on, mixed (checkbox), hover, focus, disabled |
+| `<aid-tabs>` `<aid-tab>` | a tab bar; the selected chamber is filled | selected, unselected, disabled |
+| `<aid-progress>` | a tube that fills; indeterminate without `value` | value, indeterminate |
+| `<aid-card>` | a quiet surface for grouped content | rest, `interactive` |
+| `<aid-dialog>` | a modal: it fogs the whole scene below it | open, closed, `persistent` |
+| `<aid-icon>` | 36 line icons on a 24 px grid; directional ones mirror in right-to-left | |
+| `<aid-gas>` | the bare container, for anything else | |
+
+Foundation tokens (colour, type, space, radius, control sizes) are injected with zero specificity, so any rule of yours overrides them. Theme follows `prefers-color-scheme`; `data-aid-theme="light"` or `"dark"` forces one.
+
+Keyboard: buttons and chips respond to Enter and Space, checkboxes and switches to Space, radios and tabs to the arrow keys (right-to-left aware), dialogs trap Tab and close on Escape. `prefers-reduced-motion` selects the static tier.
+
+## Use it in an app or a PWA
+
+AID is plain web technology (WebGL2 and Web Components), so it runs wherever a web app runs, including an installed PWA. Use one fixed scene for the whole app:
+
+```html
+<aid-scene fixed>
+  <!-- your whole app -->
+</aid-scene>
+```
+
+A fixed scene draws on one viewport-sized canvas: one GPU context however long the page is, and only the containers in view are simulated (up to 96 at once). Containers inside scrolling areas are clipped to them. Cache `aid.js` in your service worker like any other script; the documentation site itself is installable and is the reference for that.
 
 ## Two backdrop modes
 
@@ -101,7 +130,7 @@ npm run pages      # rebuilds the static site in docs/
 
 ## Status
 
-Version 0.2. Open items: verifying the refractivity of Ne, Ar, Kr and Xe against a dispersion table, a user study, device measurements, and more components (card, input, modal).
+Version 0.3. Open items: verifying the refractivity of Ne, Ar, Kr and Xe against a dispersion table, a user study, device measurements, native ports, and more components (table, menu, toast, slider, date picker).
 
 ## License
 

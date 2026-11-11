@@ -7,6 +7,12 @@ export interface GasContainer {
     stateFactor(): number;
     /** an evacuated (disabled) container shows a dashed wall */
     dashed(): boolean;
+    /** the wall stays visible while the chamber is empty (an unchecked box, a switch track) */
+    shell?(): boolean;
+    /** working: the excitation pulses until it returns false */
+    busy?(): boolean;
+    /** fog everything below, not only the container it covers most (a dialog scrim) */
+    veilAll?(): boolean;
 }
 export type View = 'final' | 'density' | 'light' | 'off';
 export interface EngineStats {
@@ -22,6 +28,7 @@ export interface EngineStats {
 export declare class GasEngine {
     private host;
     private canvas;
+    private fixed;
     private g;
     private gl;
     private P;
@@ -35,6 +42,12 @@ export declare class GasEngine {
     private uI;
     private uM;
     private uE;
+    private uK;
+    private uC;
+    private warned;
+    /** all container data, one row of six texels per container (see CONTAINERS in shaders.ts) */
+    private cdata;
+    private ctex;
     private grav;
     private cssAngle;
     private cssFade;
@@ -67,12 +80,14 @@ export declare class GasEngine {
     private stats;
     private disposers;
     onStats: ((s: EngineStats) => void) | null;
-    constructor(host: HTMLElement, canvas: HTMLCanvasElement, transparent: boolean);
+    constructor(host: HTMLElement, canvas: HTMLCanvasElement, transparent: boolean, fixed?: boolean);
     add(c: GasContainer): void;
     remove(c: GasContainer): void;
     /** Use a canvas or image as the content behind the gas. Pass null for a DOM backdrop. */
     setBackdrop(src: HTMLCanvasElement | HTMLImageElement | null, cssWidth?: number, cssHeight?: number): void;
     get maxTextureSize(): number;
+    /** the box the canvas covers: the scene element, or the viewport for a fixed scene */
+    private frame;
     resize(): void;
     private alloc;
     private refreshParams;

@@ -6,7 +6,10 @@
 import { AidScene } from './components/scene';
 import { AidGas } from './components/gas';
 import { AidButton, AidTabs, AidTab } from './components/controls';
-export { AidScene, AidGas, AidButton, AidTabs, AidTab };
+import { AidCheckbox, AidRadio, AidSwitch, AidChip, AidField, AidCard, AidProgress, AidDialog } from './components/form';
+import { AidIcon, ICONS } from './components/icon';
+import { TOKENS_CSS } from './core/tokens';
+export { AidScene, AidGas, AidButton, AidTabs, AidTab, AidCheckbox, AidRadio, AidSwitch, AidChip, AidField, AidCard, AidProgress, AidDialog, AidIcon, ICONS, TOKENS_CSS };
 export { GasEngine } from './engine/engine';
 export type { GasContainer, EngineStats, View } from './engine/engine';
 export { GASES, AIR_REFRACTIVITY, AIR_MOLAR_MASS, deltaN, scatterRelative, thermalSpeed, buoyancy, responseSpeed } from './core/gases';

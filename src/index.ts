@@ -6,8 +6,11 @@
 import { AidScene } from './components/scene';
 import { AidGas } from './components/gas';
 import { AidButton, AidTabs, AidTab } from './components/controls';
+import { AidCheckbox, AidRadio, AidSwitch, AidChip, AidField, AidCard, AidProgress, AidDialog } from './components/form';
+import { AidIcon, ICONS } from './components/icon';
+import { TOKENS_CSS } from './core/tokens';
 
-export { AidScene, AidGas, AidButton, AidTabs, AidTab };
+export { AidScene, AidGas, AidButton, AidTabs, AidTab, AidCheckbox, AidRadio, AidSwitch, AidChip, AidField, AidCard, AidProgress, AidDialog, AidIcon, ICONS, TOKENS_CSS };
 export { GasEngine } from './engine/engine';
 export type { GasContainer, EngineStats, View } from './engine/engine';
 export { GASES, AIR_REFRACTIVITY, AIR_MOLAR_MASS, deltaN, scatterRelative, thermalSpeed, buoyancy, responseSpeed } from './core/gases';
@@ -21,8 +24,8 @@ export type { Tier, TierConfig } from './core/tiers';
    backdrop blur scaled by the container's pressure. The blur is applied by each container's ::before and masked
    along gravity, so it is strongest where the gas has settled. Marked as an approximation in SPEC.md. */
 const GLOBAL_CSS = `
-aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs){--_aid-bf:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92)}
-aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs)[disabled]{--_aid-bf:none}
+aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-dialog,aid-switch,aid-checkbox,aid-radio){--_aid-bf:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92)}
+aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio)[disabled]{--_aid-bf:none}
 aid-scene:not([backdrop="canvas"]) aid-tab{--_aid-bf:none}
 `;
 
@@ -31,11 +34,13 @@ export function define(): void {
   if (!document.getElementById('aid-global-css')) {
     const s = document.createElement('style');
     s.id = 'aid-global-css';
-    s.textContent = GLOBAL_CSS;
+    s.textContent = TOKENS_CSS + GLOBAL_CSS;
     document.head.append(s);
   }
   const reg: Array<[string, CustomElementConstructor]> = [
     ['aid-scene', AidScene], ['aid-gas', AidGas], ['aid-button', AidButton], ['aid-tabs', AidTabs], ['aid-tab', AidTab],
+    ['aid-checkbox', AidCheckbox], ['aid-radio', AidRadio], ['aid-switch', AidSwitch], ['aid-chip', AidChip], ['aid-field', AidField],
+    ['aid-card', AidCard], ['aid-progress', AidProgress], ['aid-dialog', AidDialog], ['aid-icon', AidIcon],
   ];
   for (const [name, ctor] of reg) if (!customElements.get(name)) customElements.define(name, ctor);
 }
