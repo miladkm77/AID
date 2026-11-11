@@ -105,6 +105,16 @@ export declare class GasEngine {
     render(): void;
     wake(): void;
     private tick;
+    /** render-resolution factor found by adapt(); 1 = the tier's own resolution */
+    private scale;
+    private capped;
+    private lastAdapt;
+    /**
+     * Keeps the frame rate up on whatever device this is. While the engine is animating and frames take longer than
+     * about 24 ms, the render resolution drops in steps (to 60% at most); if that is not enough, an automatically
+     * chosen `high` tier falls back to `efficient`. It never steps back up, so it cannot oscillate.
+     */
+    private adapt;
     private lastReport;
     private report;
     get currentStats(): EngineStats;

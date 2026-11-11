@@ -11,6 +11,8 @@ export interface TierConfig {
     lightTaps: number;
     /** keep stirring while idle (costs GPU time continuously) */
     ambient: boolean;
+    /** upper bound on canvas pixels; the pixel ratio is lowered to stay under it. The gas is soft, so it tolerates this well */
+    maxPixels: number;
 }
 export declare const TIERS: Record<Tier, TierConfig>;
 /** Conservative tier choice from the signals browsers actually expose. */

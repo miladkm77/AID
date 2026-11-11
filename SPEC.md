@@ -2,7 +2,7 @@
 
 > **Summary.** AID is a user-interface material, not an effect. Every component (button, bar, tab) is a sealed container of noble gas. The look comes from a physical model: a compressible gas that gives way under a finger and settles without waves, a gas that pools under its own weight, takes its colour from the light of the content around it, and bends the background only where it is disturbed. Every behaviour is labelled *physical*, *approximation* or *artistic*. The material's parameters belong to AID and are set like any other CSS token.
 
-Status: draft · Reference implementation: `aid-gas` 0.3.0 (WebGL2, Web Components) · License: MIT
+Status: draft · Reference implementation: `aid-gas` 0.3.1 (WebGL2, Web Components) · License: MIT
 
 ## 1. Principle
 
@@ -146,6 +146,8 @@ Native ports can read their own layer content: SwiftUI layer effects (Metal), An
 | high | 128 | 60 Hz | 13 | continuous gentle stirring |
 
 One simulation step = 2 full-screen passes at grid resolution (geometry, gas). No pressure solve. The render pass returns early for every pixel outside a container. `auto` picks a tier from `prefers-reduced-motion`, `deviceMemory`, `hardwareConcurrency` and pixel ratio.
+
+**Resolution.** The canvas is capped at a pixel budget per tier (1.0, 1.5 and 2.4 million pixels) and the pixel ratio is lowered to fit. While animating, if the median frame takes longer than 24 ms, the render resolution drops in steps of 20% down to 60%; if that is not enough, an automatically chosen `high` tier falls back to `efficient`. It does not step back up. A fixed scene sleeps when idle in every tier. The static tier applies no per-container backdrop blur. A dialog fogs the page with one CSS layer, not with a simulated full-screen gas.
 
 Not yet measured: sustained FPS, thermal and battery behaviour on real phones (5 and 15 minute sessions).
 

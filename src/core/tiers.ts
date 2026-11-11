@@ -13,12 +13,14 @@ export interface TierConfig {
   lightTaps: number;
   /** keep stirring while idle (costs GPU time continuously) */
   ambient: boolean;
+  /** upper bound on canvas pixels; the pixel ratio is lowered to stay under it. The gas is soft, so it tolerates this well */
+  maxPixels: number;
 }
 
 export const TIERS: Record<Tier, TierConfig> = {
-  static:    { grid: 0,   dprCap: 1.25, simHz: 0,  lightTaps: 5,  ambient: false },
-  efficient: { grid: 80,  dprCap: 1.5,  simHz: 30, lightTaps: 9,  ambient: false },
-  high:      { grid: 128, dprCap: 2,    simHz: 60, lightTaps: 13, ambient: true },
+  static:    { grid: 0,   dprCap: 1.25, simHz: 0,  lightTaps: 5,  ambient: false, maxPixels: 1.0e6 },
+  efficient: { grid: 80,  dprCap: 1.5,  simHz: 30, lightTaps: 9,  ambient: false, maxPixels: 1.5e6 },
+  high:      { grid: 128, dprCap: 2,    simHz: 60, lightTaps: 13, ambient: true,  maxPixels: 2.4e6 },
 };
 
 interface NavigatorHints extends Navigator {

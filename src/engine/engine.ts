@@ -201,7 +201,10 @@ export class GasEngine {
     this.H = Math.max(1, r.height);
     this.refreshParams(true);
     const cfg = TIERS[this.tier];
-    const dpr = Math.min(window.devicePixelRatio || 1, cfg.dprCap);
+    // pixel ratio: the device's, capped by the tier, by a pixel budget, and by what this device proved able to keep up with
+    let dpr = Math.min(window.devicePixelRatio || 1, cfg.dprCap);
+    dpr = Math.min(dpr, Math.sqrt(cfg.maxPixels / (this.W * this.H))) * this.scale;
+    dpr = Math.max(dpr, 0.5);
     this.canvas.width = Math.round(this.W * dpr);
     this.canvas.height = Math.round(this.H * dpr);
     this.alloc();
@@ -238,7 +241,9 @@ export class GasEngine {
         a = a.parentNode || (a instanceof ShadowRoot ? a.host : null);
       }
     }
-    const t = chooseTier(this.scene.quality);
+    let t = chooseTier(this.scene.quality);
+    if (t === 'high' && this.capped && this.scene.quality === 'auto') t = 'efficient';
+    if (this.host.dataset.aidTier !== t) this.host.dataset.aidTier = t;
     if (t !== this.tier) {
       this.tier = t;
       if (!force) this.resize();
@@ -473,7 +478,7 @@ export class GasEngine {
     p.vy *= Math.exp(-dt * 8);
     let moving = this.collect(dt) || p.str > 2;
     const now = performance.now() / 1000;
-    const simOn = cfg.simHz > 0 && (cfg.ambient || moving || now - this.lastActive < 2.2);
+    const simOn = cfg.simHz > 0 && ((cfg.ambient && !this.fixed) || moving || now - this.lastActive < 2.2);
     if (simOn || (cfg.simHz === 0 && moving)) this.flowT += dt * this.speed();
     if (simOn) {
       this.acc += dt;
@@ -495,9 +500,33 @@ export class GasEngine {
     else this.report('asleep');
   };
 
+  /** render-resolution factor found by adapt(); 1 = the tier's own resolution */
+  private scale = 1;
+  private capped = false;
+  private lastAdapt = 0;
+
+  /**
+   * Keeps the frame rate up on whatever device this is. While the engine is animating and frames take longer than
+   * about 24 ms, the render resolution drops in steps (to 60% at most); if that is not enough, an automatically
+   * chosen `high` tier falls back to `efficient`. It never steps back up, so it cannot oscillate.
+   */
+  private adapt(now: number): void {
+    if (now - this.lastAdapt < 1200 || this.frames.length < 24) return;
+    // the median, so one long gap (a background tab, a resize) is not mistaken for a slow device
+    const avg = [...this.frames].sort((a, b) => a - b)[this.frames.length >> 1];
+    if (avg < 24) return;
+    this.lastAdapt = now;
+    this.frames.length = 0;
+    if (this.scale > 0.61) this.scale = Math.max(0.6, this.scale * 0.8);
+    else if (this.tier === 'high' && this.scene.quality === 'auto') { this.capped = true; this.refreshParams(true); }
+    else return;
+    this.resize();
+  }
+
   private lastReport = 0;
   private report(state: EngineStats['state']): void {
     const now = performance.now();
+    if (state !== 'asleep') this.adapt(now);
     if (state !== 'asleep' && now - this.lastReport < 500) return;
     this.lastReport = now;
     const avg = this.frames.length ? this.frames.reduce((a, b) => a + b, 0) / this.frames.length : 0;

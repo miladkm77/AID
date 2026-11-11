@@ -369,9 +369,9 @@ function triple(v) {
 
 // src/core/tiers.ts
 var TIERS = {
-  static: { grid: 0, dprCap: 1.25, simHz: 0, lightTaps: 5, ambient: false },
-  efficient: { grid: 80, dprCap: 1.5, simHz: 30, lightTaps: 9, ambient: false },
-  high: { grid: 128, dprCap: 2, simHz: 60, lightTaps: 13, ambient: true }
+  static: { grid: 0, dprCap: 1.25, simHz: 0, lightTaps: 5, ambient: false, maxPixels: 1e6 },
+  efficient: { grid: 80, dprCap: 1.5, simHz: 30, lightTaps: 9, ambient: false, maxPixels: 15e5 },
+  high: { grid: 128, dprCap: 2, simHz: 60, lightTaps: 13, ambient: true, maxPixels: 24e5 }
 };
 function chooseTier(q) {
   if (q === "static" || q === "efficient" || q === "high") return q;
@@ -464,7 +464,7 @@ var GasEngine = class {
       p.vy *= Math.exp(-dt * 8);
       let moving = this.collect(dt) || p.str > 2;
       const now = performance.now() / 1e3;
-      const simOn = cfg.simHz > 0 && (cfg.ambient || moving || now - this.lastActive < 2.2);
+      const simOn = cfg.simHz > 0 && (cfg.ambient && !this.fixed || moving || now - this.lastActive < 2.2);
       if (simOn || cfg.simHz === 0 && moving) this.flowT += dt * this.speed();
       if (simOn) {
         this.acc += dt;
@@ -487,6 +487,10 @@ var GasEngine = class {
       if (keep && this.visible && this.onscreen) this.raf = requestAnimationFrame(this.tick);
       else this.report("asleep");
     };
+    /** render-resolution factor found by adapt(); 1 = the tier's own resolution */
+    this.scale = 1;
+    this.capped = false;
+    this.lastAdapt = 0;
     this.lastReport = 0;
     const gl = canvas.getContext("webgl2", {
       alpha: transparent,
@@ -568,7 +572,9 @@ var GasEngine = class {
     this.H = Math.max(1, r.height);
     this.refreshParams(true);
     const cfg = TIERS[this.tier];
-    const dpr = Math.min(window.devicePixelRatio || 1, cfg.dprCap);
+    let dpr = Math.min(window.devicePixelRatio || 1, cfg.dprCap);
+    dpr = Math.min(dpr, Math.sqrt(cfg.maxPixels / (this.W * this.H))) * this.scale;
+    dpr = Math.max(dpr, 0.5);
     this.canvas.width = Math.round(this.W * dpr);
     this.canvas.height = Math.round(this.H * dpr);
     this.alloc();
@@ -609,7 +615,9 @@ var GasEngine = class {
         a = a.parentNode || (a instanceof ShadowRoot ? a.host : null);
       }
     }
-    const t = chooseTier(this.scene.quality);
+    let t = chooseTier(this.scene.quality);
+    if (t === "high" && this.capped && this.scene.quality === "auto") t = "efficient";
+    if (this.host.dataset.aidTier !== t) this.host.dataset.aidTier = t;
     if (t !== this.tier) {
       this.tier = t;
       if (!force) this.resize();
@@ -867,8 +875,27 @@ var GasEngine = class {
       this.raf = requestAnimationFrame(this.tick);
     }
   }
+  /**
+   * Keeps the frame rate up on whatever device this is. While the engine is animating and frames take longer than
+   * about 24 ms, the render resolution drops in steps (to 60% at most); if that is not enough, an automatically
+   * chosen `high` tier falls back to `efficient`. It never steps back up, so it cannot oscillate.
+   */
+  adapt(now) {
+    if (now - this.lastAdapt < 1200 || this.frames.length < 24) return;
+    const avg = [...this.frames].sort((a, b) => a - b)[this.frames.length >> 1];
+    if (avg < 24) return;
+    this.lastAdapt = now;
+    this.frames.length = 0;
+    if (this.scale > 0.61) this.scale = Math.max(0.6, this.scale * 0.8);
+    else if (this.tier === "high" && this.scene.quality === "auto") {
+      this.capped = true;
+      this.refreshParams(true);
+    } else return;
+    this.resize();
+  }
   report(state) {
     const now = performance.now();
+    if (state !== "asleep") this.adapt(now);
     if (state !== "asleep" && now - this.lastReport < 500) return;
     this.lastReport = now;
     const avg = this.frames.length ? this.frames.reduce((a, b) => a + b, 0) / this.frames.length : 0;
@@ -1735,6 +1762,7 @@ var AidDialog = class extends AidGas {
   constructor() {
     super();
     this.back = null;
+    this.ro = null;
     /* only a click on the fog itself closes; the panel lives in the shadow tree, so the event target alone cannot tell */
     this.onClick = (e) => {
       if (e.composedPath()[0] === this && !this.hasAttribute("persistent")) this.close();
@@ -1768,7 +1796,7 @@ var AidDialog = class extends AidGas {
     return ["open"];
   }
   extraCss() {
-    return ":host{display:none;position:absolute;inset:0;z-index:1000;padding:16px;border-radius:0;--aid-pressure:.5;--aid-weight:0;--aid-membrane:0}:host([open]){display:flex}.panel{display:block;width:min(100%,420px);max-height:100%;overflow:auto;border-radius:var(--aid-radius-xl,24px);padding:20px;color:inherit;--aid-pressure:1;--aid-weight:.2}";
+    return ":host{display:none;position:absolute;inset:0;z-index:1000;padding:16px;border-radius:0;--aid-membrane:0}:host::before{-webkit-mask-image:none;mask-image:none;border-radius:0;background:color-mix(in srgb,var(--aid-color-bg,#EEF0F3) 55%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);-webkit-clip-path:var(--_hole,none);clip-path:var(--_hole,none)}:host::after{display:none}:host([open]){display:flex}.panel{display:block;width:min(100%,420px);max-height:100%;overflow:auto;border-radius:var(--aid-radius-xl,24px);padding:20px;color:inherit;--aid-pressure:1.2;--aid-weight:.15;--_aid-bf:blur(12px) saturate(.9)}";
   }
   connectedCallback() {
     super.connectedCallback();
@@ -1777,12 +1805,25 @@ var AidDialog = class extends AidGas {
     if (this.scene?.hasAttribute("fixed")) this.style.position = "fixed";
     this.addEventListener("click", this.onClick);
     this.addEventListener("keydown", this.onKey);
+    this.ro = new ResizeObserver(() => this.hole());
+    this.ro.observe(this);
+    this.ro.observe(this.shadowRoot.querySelector(".panel"));
     if (this.open) this.enter();
+  }
+  /** cut the panel's rounded shape out of the fog layer */
+  hole() {
+    if (!this.open) return;
+    const h = this.getBoundingClientRect(), panel = this.shadowRoot.querySelector(".panel"), q = panel.getBoundingClientRect();
+    if (h.width < 1 || q.width < 1) return;
+    const r = Math.min(parseFloat(getComputedStyle(panel).borderTopLeftRadius) || 0, q.width / 2, q.height / 2);
+    const x = q.left - h.left, y = q.top - h.top, w = q.width, k = q.height;
+    this.style.setProperty("--_hole", `path(evenodd,"M0 0H${h.width}V${h.height}H0Z M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${k - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(k - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}Z")`);
   }
   disconnectedCallback() {
     super.disconnectedCallback();
     this.removeEventListener("click", this.onClick);
     this.removeEventListener("keydown", this.onKey);
+    this.ro?.disconnect();
   }
   attributeChangedCallback(name) {
     if (name === "open" && this.isConnected) {
@@ -1806,13 +1847,14 @@ var AidDialog = class extends AidGas {
     this.dispatchEvent(new Event("close"));
   }
   veilAll() {
-    return true;
+    return false;
   }
   focusables() {
     return Array.from(this.querySelectorAll("aid-button,aid-chip,aid-checkbox,aid-radio,aid-switch,aid-tab,input,textarea,select,button,a[href],[tabindex]")).filter((e) => !e.hasAttribute("disabled") && e.tabIndex >= 0);
   }
   enter() {
     this.back = document.activeElement;
+    requestAnimationFrame(() => this.hole());
     queueMicrotask(() => {
       const f = this.focusables()[0];
       if (f) f.focus();
@@ -1822,8 +1864,9 @@ var AidDialog = class extends AidGas {
     if (this.back instanceof HTMLElement) this.back.focus();
     this.back = null;
   }
+  /* the dialog itself holds no gas */
   stateFactor() {
-    return this.open ? 1 : 0;
+    return 0;
   }
 };
 
@@ -1942,6 +1985,8 @@ var GLOBAL_CSS = `
 aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-dialog,aid-switch,aid-checkbox,aid-radio){--_aid-bf:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92)}
 aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio)[disabled]{--_aid-bf:none}
 aid-scene:not([backdrop="canvas"]) aid-tab{--_aid-bf:none}
+/* the static tier is for the weakest devices: one blur per container is the most expensive thing on the page there */
+aid-scene[data-aid-tier="static"] :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio){--_aid-bf:none}
 `;
 function define() {
   if (typeof window === "undefined" || !window.customElements) return;

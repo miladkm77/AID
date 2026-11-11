@@ -286,17 +286,23 @@ export class AidProgress extends AidGas {
 }
 
 /**
- * <aid-dialog open> — a modal. Elevation is fog: the dialog fills the whole scene with a thin gas that veils
- * everything below, and its panel is a dense chamber on top. Escape and a click on the fog close it (unless `persistent`);
+ * <aid-dialog open> — a modal. Elevation is fog: everything below the dialog is veiled and blurred, and its panel is a
+ * dense chamber of gas on top. Escape and a click on the fog close it (unless `persistent`);
  * focus moves into the panel and returns to where it was. Fires 'close'.
  */
 export class AidDialog extends AidGas {
   static get observedAttributes(): string[] { return ['open']; }
   private back: Element | null = null;
+  private ro: ResizeObserver | null = null;
   protected extraCss(): string {
-    return ':host{display:none;position:absolute;inset:0;z-index:1000;padding:16px;border-radius:0;--aid-pressure:.5;--aid-weight:0;--aid-membrane:0}' +
+    /* the fog over the page is a single CSS layer, not a simulated full-screen gas: a whole viewport of gas would cost
+       more than everything else on the page together. The panel is the gas. */
+    return ':host{display:none;position:absolute;inset:0;z-index:1000;padding:16px;border-radius:0;--aid-membrane:0}' +
+      /* the fog has a hole where the panel is, so the panel's own gas (drawn underneath) is not veiled with the page */
+      ':host::before{-webkit-mask-image:none;mask-image:none;border-radius:0;background:color-mix(in srgb,var(--aid-color-bg,#EEF0F3) 55%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);-webkit-clip-path:var(--_hole,none);clip-path:var(--_hole,none)}' +
+      ':host::after{display:none}' +
       ':host([open]){display:flex}' +
-      '.panel{display:block;width:min(100%,420px);max-height:100%;overflow:auto;border-radius:var(--aid-radius-xl,24px);padding:20px;color:inherit;--aid-pressure:1;--aid-weight:.2}';
+      '.panel{display:block;width:min(100%,420px);max-height:100%;overflow:auto;border-radius:var(--aid-radius-xl,24px);padding:20px;color:inherit;--aid-pressure:1.2;--aid-weight:.15;--_aid-bf:blur(12px) saturate(.9)}';
   }
   constructor() {
     super();
@@ -314,9 +320,22 @@ export class AidDialog extends AidGas {
     if (this.scene?.hasAttribute('fixed')) this.style.position = 'fixed';
     this.addEventListener('click', this.onClick);
     this.addEventListener('keydown', this.onKey);
+    this.ro = new ResizeObserver(() => this.hole());
+    this.ro.observe(this);
+    this.ro.observe(this.shadowRoot!.querySelector('.panel')!);
     if (this.open) this.enter();
   }
-  disconnectedCallback(): void { super.disconnectedCallback(); this.removeEventListener('click', this.onClick); this.removeEventListener('keydown', this.onKey); }
+
+  /** cut the panel's rounded shape out of the fog layer */
+  private hole(): void {
+    if (!this.open) return;
+    const h = this.getBoundingClientRect(), panel = this.shadowRoot!.querySelector('.panel') as HTMLElement, q = panel.getBoundingClientRect();
+    if (h.width < 1 || q.width < 1) return;
+    const r = Math.min(parseFloat(getComputedStyle(panel).borderTopLeftRadius) || 0, q.width / 2, q.height / 2);
+    const x = q.left - h.left, y = q.top - h.top, w = q.width, k = q.height;
+    this.style.setProperty('--_hole', `path(evenodd,"M0 0H${h.width}V${h.height}H0Z M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${k - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(k - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}Z")`);
+  }
+  disconnectedCallback(): void { super.disconnectedCallback(); this.removeEventListener('click', this.onClick); this.removeEventListener('keydown', this.onKey); this.ro?.disconnect(); }
   attributeChangedCallback(name?: string): void {
     if (name === 'open' && this.isConnected) { if (this.open) this.enter(); else this.leave(); }
     super.attributeChangedCallback();
@@ -325,7 +344,7 @@ export class AidDialog extends AidGas {
   set open(v: boolean) { this.toggleAttribute('open', v); }
   show(): void { this.open = true; }
   close(): void { if (!this.open) return; this.open = false; this.dispatchEvent(new Event('close')); }
-  veilAll(): boolean { return true; }
+  veilAll(): boolean { return false; }
 
   private focusables(): HTMLElement[] {
     return (Array.from(this.querySelectorAll('aid-button,aid-chip,aid-checkbox,aid-radio,aid-switch,aid-tab,input,textarea,select,button,a[href],[tabindex]')) as HTMLElement[])
@@ -333,6 +352,7 @@ export class AidDialog extends AidGas {
   }
   private enter(): void {
     this.back = document.activeElement;
+    requestAnimationFrame(() => this.hole());
     queueMicrotask(() => { const f = this.focusables()[0]; if (f) f.focus(); });
   }
   private leave(): void { if (this.back instanceof HTMLElement) this.back.focus(); this.back = null; }
@@ -347,5 +367,6 @@ export class AidDialog extends AidGas {
     if (e.shiftKey && cur === first) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && cur === last) { e.preventDefault(); first.focus(); }
   };
-  stateFactor(): number { return this.open ? 1 : 0; }
+  /* the dialog itself holds no gas */
+  stateFactor(): number { return 0; }
 }

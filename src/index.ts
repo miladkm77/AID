@@ -27,6 +27,8 @@ const GLOBAL_CSS = `
 aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-dialog,aid-switch,aid-checkbox,aid-radio){--_aid-bf:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92)}
 aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio)[disabled]{--_aid-bf:none}
 aid-scene:not([backdrop="canvas"]) aid-tab{--_aid-bf:none}
+/* the static tier is for the weakest devices: one blur per container is the most expensive thing on the page there */
+aid-scene[data-aid-tier="static"] :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio){--_aid-bf:none}
 `;
 
 export function define(): void {

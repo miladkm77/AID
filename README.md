@@ -93,6 +93,8 @@ Keyboard: buttons and chips respond to Enter and Space, checkboxes and switches 
 
 ## Use it in an app or a PWA
 
+Step-by-step guide for adding AID to an existing product: [INTEGRATION.md](INTEGRATION.md).
+
 AID is plain web technology (WebGL2 and Web Components), so it runs wherever a web app runs, including an installed PWA. Use one fixed scene for the whole app:
 
 ```html

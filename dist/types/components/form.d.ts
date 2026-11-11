@@ -103,16 +103,19 @@ export declare class AidProgress extends AidGas {
     private sync;
 }
 /**
- * <aid-dialog open> — a modal. Elevation is fog: the dialog fills the whole scene with a thin gas that veils
- * everything below, and its panel is a dense chamber on top. Escape and a click on the fog close it (unless `persistent`);
+ * <aid-dialog open> — a modal. Elevation is fog: everything below the dialog is veiled and blurred, and its panel is a
+ * dense chamber of gas on top. Escape and a click on the fog close it (unless `persistent`);
  * focus moves into the panel and returns to where it was. Fires 'close'.
  */
 export declare class AidDialog extends AidGas {
     static get observedAttributes(): string[];
     private back;
+    private ro;
     protected extraCss(): string;
     constructor();
     connectedCallback(): void;
+    /** cut the panel's rounded shape out of the fog layer */
+    private hole;
     disconnectedCallback(): void;
     attributeChangedCallback(name?: string): void;
     get open(): boolean;
