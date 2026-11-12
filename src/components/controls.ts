@@ -73,7 +73,9 @@ export class AidButton extends AidGas {
  */
 export class AidTabs extends AidGas {
   protected extraCss(): string {
-    return ':host{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;padding:5px;border-radius:30px}';
+    return ':host{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;padding:5px;border-radius:30px}' +
+      /* vertical: a side navigation */
+      ':host([vertical]){grid-auto-flow:row;grid-auto-columns:auto;gap:2px;padding:6px;border-radius:20px;align-content:start}';
   }
 
   connectedCallback(): void {
@@ -91,7 +93,9 @@ export class AidTabs extends AidGas {
   get tabs(): AidTab[] { return Array.from(this.querySelectorAll(':scope > aid-tab')) as AidTab[]; }
 
   select(i: number): void {
-    this.tabs.forEach((t, j) => (t.selected = j === i));
+    const v = this.hasAttribute('vertical');
+    this.setAttribute('aria-orientation', v ? 'vertical' : 'horizontal');
+    this.tabs.forEach((t, j) => { t.selected = j === i; t.toggleAttribute('data-vertical', v); });
     this.scene?.wake();
   }
 
@@ -110,6 +114,7 @@ export class AidTab extends AidGas {
 
   protected extraCss(): string {
     return ':host{cursor:pointer;flex-direction:column;gap:1px;border-radius:25px;margin:0;user-select:none;-webkit-user-select:none}' +
+      ':host([data-vertical]){flex-direction:row;justify-content:flex-start;gap:10px;min-height:44px;padding:0 14px;border-radius:14px}' +
       ':host(:focus-visible){outline:2px solid currentColor;outline-offset:2px}';
   }
 
@@ -145,8 +150,13 @@ export class AidTab extends AidGas {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.pulse(); this.click(); return; }
     // RTL-aware arrow navigation
     const rtl = getComputedStyle(this).direction === 'rtl';
-    if (e.key === 'ArrowLeft') next = i + (rtl ? 1 : -1);
-    if (e.key === 'ArrowRight') next = i + (rtl ? -1 : 1);
+    if (bar.hasAttribute('vertical')) {
+      if (e.key === 'ArrowUp') next = i - 1;
+      if (e.key === 'ArrowDown') next = i + 1;
+    } else {
+      if (e.key === 'ArrowLeft') next = i + (rtl ? 1 : -1);
+      if (e.key === 'ArrowRight') next = i + (rtl ? -1 : 1);
+    }
     if (next < 0 || next >= tabs.length) return;
     e.preventDefault();
     tabs[next].focus();

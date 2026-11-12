@@ -2,7 +2,7 @@
 
 > **Summary.** AID is a user-interface material, not an effect. Every component (button, bar, tab) is a sealed container of noble gas. The look comes from a physical model: a compressible gas that gives way under a finger and settles without waves, a gas that pools under its own weight, takes its colour from the light of the content around it, and bends the background only where it is disturbed. Every behaviour is labelled *physical*, *approximation* or *artistic*. The material's parameters belong to AID and are set like any other CSS token.
 
-Status: draft · Reference implementation: `aid-gas` 0.3.1 (WebGL2, Web Components) · License: MIT
+Status: draft · Reference implementation: `aid-gas` 0.4.0 (WebGL2, Web Components) · License: MIT
 
 ## 1. Principle
 

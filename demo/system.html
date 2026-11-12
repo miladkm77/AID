@@ -234,6 +234,62 @@ a{color:inherit}
     </div>
   </section>
 
+  <section class="sec" id="feedback">
+    <h2 data-fa="بازخورد">Feedback</h2>
+    <h3>Alert</h3>
+    <div class="stack" style="width:min(100%,560px);gap:10px;justify-items:stretch">
+      <aid-alert kind="info"><aid-icon name="info"></aid-icon><span data-fa="نسخه‌ی جدید آماده است.">A new version is ready.</span></aid-alert>
+      <aid-alert kind="success"><aid-icon name="success"></aid-icon><span data-fa="پرونده تأیید شد.">The case was approved.</span></aid-alert>
+      <aid-alert kind="warning"><aid-icon name="warning"></aid-icon><span data-fa="سه پرونده منتظر بررسی است.">Three cases are waiting for review.</span></aid-alert>
+      <aid-alert kind="danger"><aid-icon name="error"></aid-icon><span data-fa="ارسال انجام نشد. دوباره تلاش کنید.">Sending failed. Try again.</span></aid-alert>
+    </div>
+    <h3>Toast</h3>
+    <div class="row">
+      <aid-button size="sm" data-toast="success" data-fa="موفق">Success</aid-button>
+      <aid-button size="sm" data-toast="danger" data-fa="خطا">Error</aid-button>
+      <aid-button size="sm" data-toast="" data-fa="ساده">Plain</aid-button>
+    </div>
+  </section>
+
+  <section class="sec" id="menu">
+    <h2 data-fa="منو و اسلایدر">Menu and slider</h2>
+    <h3>Menu</h3>
+    <aid-button id="menuBtn"><span data-fa="عملیات">Actions</span><aid-icon name="chevron-down"></aid-icon></aid-button>
+    <aid-menu for="menuBtn" id="menu1">
+      <aid-menu-item value="edit"><aid-icon name="edit"></aid-icon><span data-fa="ویرایش">Edit</span></aid-menu-item>
+      <aid-menu-item value="copy"><aid-icon name="copy"></aid-icon><span data-fa="کپی">Duplicate</span></aid-menu-item>
+      <aid-menu-item value="download" disabled><aid-icon name="download"></aid-icon><span data-fa="دریافت">Download</span></aid-menu-item>
+      <aid-menu-item value="delete" danger><aid-icon name="trash"></aid-icon><span data-fa="حذف">Delete</span></aid-menu-item>
+    </aid-menu>
+    <span class="cap" id="menuOut"></span>
+    <h3>Slider</h3>
+    <div class="stack" style="width:min(100%,380px);gap:14px;justify-items:stretch">
+      <aid-slider value="40" aria-label="Volume" id="sl1"></aid-slider>
+      <aid-slider value="3" min="0" max="10" step="1" aria-label="Steps"></aid-slider>
+      <aid-slider value="70" disabled aria-label="Disabled"></aid-slider>
+    </div>
+  </section>
+
+  <section class="sec" id="table">
+    <h2 data-fa="جدول و ناوبری کناری">Table and side navigation</h2>
+    <p class="note">Data is content, not a control: tables use the tokens and no gas. Only the actions in a row are gas.</p>
+    <div class="aid-table-wrap"><table class="aid-table">
+      <thead><tr><th>Case</th><th>Hospital</th><th>Status</th><th class="num">Amount</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>1248</td><td>Central</td><td><aid-chip static>Approved</aid-chip></td><td class="num">12,400,000</td><td><aid-button size="sm" variant="quiet" icon aria-label="More"><aid-icon name="more"></aid-icon></aid-button></td></tr>
+        <tr aria-selected="true"><td>1249</td><td>Northern</td><td><aid-chip static>Draft</aid-chip></td><td class="num">8,150,000</td><td><aid-button size="sm" variant="quiet" icon aria-label="More"><aid-icon name="more"></aid-icon></aid-button></td></tr>
+        <tr><td>1250</td><td>Riverside</td><td><aid-chip static>Rejected</aid-chip></td><td class="num">3,900,000</td><td><aid-button size="sm" variant="quiet" icon aria-label="More"><aid-icon name="more"></aid-icon></aid-button></td></tr>
+      </tbody>
+    </table></div>
+    <h3>Side navigation</h3>
+    <aid-tabs vertical aria-label="Main" style="width:220px;height:auto;font-size:14px">
+      <aid-tab selected><aid-icon name="home"></aid-icon><span data-fa="خانه">Home</span></aid-tab>
+      <aid-tab><aid-icon name="file"></aid-icon><span data-fa="پرونده‌ها">Cases</span></aid-tab>
+      <aid-tab><aid-icon name="chart"></aid-icon><span data-fa="گزارش‌ها">Reports</span></aid-tab>
+      <aid-tab><aid-icon name="settings"></aid-icon><span data-fa="تنظیمات">Settings</span></aid-tab>
+    </aid-tabs>
+  </section>
+
   <section class="sec" id="surface">
     <h2 data-fa="کارت و دیالوگ">Card and dialog</h2>
     <div class="cards">
@@ -273,7 +329,7 @@ a{color:inherit}
 </aid-scene>
 
 <script type="module">
-import { ICONS, GASES } from '../dist/aid.js';
+import { ICONS, GASES, toast } from '../dist/aid.js';
 const $ = (s, r = document) => r.querySelector(s), scene = $('#scene'), root = document.documentElement;
 const el = (tag, attrs = {}, text) => { const e = document.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
 
@@ -302,6 +358,10 @@ const mc = $('#mxChip');
 for (const [s, a] of [['Unselected', {}], ['Selected', { selected: '' }], ['Hover', { force: 'hover' }], ['Focus', { selected: '', force: 'focus' }], ['Disabled', { disabled: '' }], ['Static', { static: '' }]]) {
   const d = el('div', { class: 'stack' }); d.append(el('aid-chip', { ...a, 'data-fa': 'فیلتر' }, 'Filter'), el('span', { class: 'cap' }, s)); mc.append(d);
 }
+
+/* toast, menu */
+document.querySelectorAll('[data-toast]').forEach((b) => b.addEventListener('click', () => toast(document.documentElement.dir === 'rtl' ? 'تغییرات ذخیره شد.' : 'Changes were saved.', { kind: b.dataset.toast || undefined, scene })));
+$('#menu1').addEventListener('select', (e) => { $('#menuOut').textContent = ' → ' + e.detail.value; });
 
 /* dialog */
 const dlg = $('#dlg');

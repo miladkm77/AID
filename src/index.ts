@@ -8,9 +8,11 @@ import { AidGas } from './components/gas';
 import { AidButton, AidTabs, AidTab } from './components/controls';
 import { AidCheckbox, AidRadio, AidSwitch, AidChip, AidField, AidCard, AidProgress, AidDialog } from './components/form';
 import { AidIcon, ICONS } from './components/icon';
+import { AidAlert, AidToast, AidMenu, AidMenuItem, AidSlider, toast } from './components/extra';
 import { TOKENS_CSS } from './core/tokens';
 
-export { AidScene, AidGas, AidButton, AidTabs, AidTab, AidCheckbox, AidRadio, AidSwitch, AidChip, AidField, AidCard, AidProgress, AidDialog, AidIcon, ICONS, TOKENS_CSS };
+export { AidScene, AidGas, AidButton, AidTabs, AidTab, AidCheckbox, AidRadio, AidSwitch, AidChip, AidField, AidCard, AidProgress, AidDialog, AidIcon, ICONS, TOKENS_CSS, AidAlert, AidToast, AidMenu, AidMenuItem, AidSlider, toast };
+export type { ToastOptions } from './components/extra';
 export { GasEngine } from './engine/engine';
 export type { GasContainer, EngineStats, View } from './engine/engine';
 export { GASES, AIR_REFRACTIVITY, AIR_MOLAR_MASS, deltaN, scatterRelative, thermalSpeed, buoyancy, responseSpeed } from './core/gases';
@@ -27,6 +29,16 @@ const GLOBAL_CSS = `
 aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-dialog,aid-switch,aid-checkbox,aid-radio){--_aid-bf:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92)}
 aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio)[disabled]{--_aid-bf:none}
 aid-scene:not([backdrop="canvas"]) aid-tab{--_aid-bf:none}
+aid-scene:not([backdrop="canvas"]) aid-alert{--_aid-bf:blur(6px) saturate(.92)}
+.aid-toasts{inset-inline:0;bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:980;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 12px;pointer-events:none}
+/* data tables are plain content: no gas, only tokens */
+:where(.aid-table-wrap){overflow-x:auto}
+:where(.aid-table){width:100%;border-collapse:collapse;font-size:var(--aid-text-sm,14px);color:var(--aid-color-ink)}
+:where(.aid-table) :where(th,td){text-align:start;padding:10px 12px;border-bottom:1px solid var(--aid-color-line);vertical-align:middle;white-space:nowrap}
+:where(.aid-table) :where(th){font-weight:600;color:var(--aid-color-ink-muted);font-size:var(--aid-text-xs,12px)}
+:where(.aid-table) :where(tbody tr:hover){background:color-mix(in srgb,var(--aid-color-ink) 4%,transparent)}
+:where(.aid-table) :where(tr[aria-selected="true"]){background:color-mix(in srgb,var(--aid-color-ink) 8%,transparent)}
+:where(.aid-table) :where(.num){text-align:end;font-variant-numeric:tabular-nums}
 /* the static tier is for the weakest devices: one blur per container is the most expensive thing on the page there */
 aid-scene[data-aid-tier="static"] :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio){--_aid-bf:none}
 `;
@@ -43,6 +55,7 @@ export function define(): void {
     ['aid-scene', AidScene], ['aid-gas', AidGas], ['aid-button', AidButton], ['aid-tabs', AidTabs], ['aid-tab', AidTab],
     ['aid-checkbox', AidCheckbox], ['aid-radio', AidRadio], ['aid-switch', AidSwitch], ['aid-chip', AidChip], ['aid-field', AidField],
     ['aid-card', AidCard], ['aid-progress', AidProgress], ['aid-dialog', AidDialog], ['aid-icon', AidIcon],
+    ['aid-alert', AidAlert], ['aid-toast', AidToast], ['aid-menu', AidMenu], ['aid-menu-item', AidMenuItem], ['aid-slider', AidSlider],
   ];
   for (const [name, ctor] of reg) if (!customElements.get(name)) customElements.define(name, ctor);
 }

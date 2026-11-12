@@ -84,12 +84,18 @@ The full list, the physical model and the label of every behaviour are in [SPEC.
 | `<aid-progress>` | a tube that fills; indeterminate without `value` | value, indeterminate |
 | `<aid-card>` | a quiet surface for grouped content | rest, `interactive` |
 | `<aid-dialog>` | a modal: it fogs the whole scene below it | open, closed, `persistent` |
+| `<aid-alert>` | an inline message; `kind` info, success, warning, danger | |
+| `<aid-toast>` · `toast()` | a transient message; closes itself, holds while hovered or focused | |
+| `<aid-menu>` `<aid-menu-item>` | a popover list of actions, opened by the element named in `for` | open, closed; item rest, hover, focus, danger, disabled |
+| `<aid-slider>` | a range: `min`, `max`, `step`, `value` | rest, hover, focus, dragging, disabled |
+| `<aid-tabs vertical>` | the same tab bar as a side navigation | |
+| `.aid-table` | a plain data table on the tokens; data is content, so it carries no gas | row hover, `aria-selected` |
 | `<aid-icon>` | 36 line icons on a 24 px grid; directional ones mirror in right-to-left | |
 | `<aid-gas>` | the bare container, for anything else | |
 
 Foundation tokens (colour, type, space, radius, control sizes) are injected with zero specificity, so any rule of yours overrides them. Theme follows `prefers-color-scheme`; `data-aid-theme="light"` or `"dark"` forces one.
 
-Keyboard: buttons and chips respond to Enter and Space, checkboxes and switches to Space, radios and tabs to the arrow keys (right-to-left aware), dialogs trap Tab and close on Escape. `prefers-reduced-motion` selects the static tier.
+Keyboard: buttons and chips respond to Enter and Space, checkboxes and switches to Space, radios and tabs to the arrow keys (right-to-left aware), dialogs trap Tab and close on Escape, menus move with the arrow keys, Home and End and close on Escape, sliders step with the arrow keys and jump with Home and End. `prefers-reduced-motion` selects the static tier.
 
 ## Use it in an app or a PWA
 

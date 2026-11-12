@@ -5,16 +5,18 @@ A guide for whoever (person or coding agent) adds AID to an existing web app. Re
 ## 1. Install (pin a version)
 
 ```bash
-npm i github:miladkm77/aid#v0.3.1
+npm i github:miladkm77/aid#v0.4.0
 ```
+
+Any commit hash works in place of the tag (`#<hash>`), which is the safest pin for a product.
 
 ```js
 import 'aid-gas';            // registers the elements and injects the foundation tokens
 ```
 
-No build step is needed: the package ships `dist/aid.js` (ES module; the minified build is 60 kB) and TypeScript types.
+No build step is needed: the package ships `dist/aid.js` (ES module; the minified build is 75 kB) and TypeScript types.
 Without a bundler, copy `dist/aid.js` into the app's static files and load it with `<script type="module" src="/aid.js"></script>`,
-or use `https://cdn.jsdelivr.net/gh/miladkm77/aid@v0.3.1/dist/aid.js`.
+or use `https://cdn.jsdelivr.net/gh/miladkm77/aid@v0.4.0/dist/aid.js`.
 
 ## 2. One scene for the whole app
 
@@ -43,6 +45,12 @@ Wrap the app shell once, as high as possible, and never nest scenes:
 | card, panel | `<aid-card>` | Use sparingly: plain content does not need a container. |
 | modal | `<aid-dialog>` | `show()`, `close()`, `open`; `close` event; `persistent`. |
 | progress | `<aid-progress value="40">` | No `value` = indeterminate. |
+| inline message, banner | `<aid-alert kind="info\|success\|warning\|danger">` | Announces itself: `role="status"`, or `role="alert"` for warning and danger. |
+| toast, snackbar | `toast('Saved', { kind: 'success' })` | Imported from `aid-gas`. `duration` in ms (0 keeps it open). Returns the element; it fires `close`. |
+| dropdown menu, action sheet | `<aid-menu for="triggerId"><aid-menu-item value="…">` | `select` event with `detail.value`. `danger` and `disabled` on items. Not a replacement for a native `select`. |
+| range input | `<aid-slider min max step value>` | `input` while dragging, `change` on release. Not form-associated. |
+| sidebar navigation | `<aid-tabs vertical>` | Same events as the horizontal bar. |
+| data table | `<div class="aid-table-wrap"><table class="aid-table">` | Keep the app's own table logic; the class only styles it. Row actions are `aid-button variant="quiet" size="sm"`. |
 | icons | `<aid-icon name="…">` | 36 icons; keep the app's own icon set for anything missing. |
 
 In React, custom-element events need `ref` + `addEventListener` (React 18) or work directly as `onChange`-style props only for native events; boolean attributes are set as `disabled={x || undefined}`. In Vue, tell the compiler the tags are custom elements (`isCustomElement: tag => tag.startsWith('aid-')`).

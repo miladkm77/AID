@@ -1358,7 +1358,7 @@ var AidTabs = class extends AidGas {
     };
   }
   extraCss() {
-    return ":host{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;padding:5px;border-radius:30px}";
+    return ":host{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;padding:5px;border-radius:30px}:host([vertical]){grid-auto-flow:row;grid-auto-columns:auto;gap:2px;padding:6px;border-radius:20px;align-content:start}";
   }
   connectedCallback() {
     super.connectedCallback();
@@ -1374,7 +1374,12 @@ var AidTabs = class extends AidGas {
     return Array.from(this.querySelectorAll(":scope > aid-tab"));
   }
   select(i) {
-    this.tabs.forEach((t, j) => t.selected = j === i);
+    const v = this.hasAttribute("vertical");
+    this.setAttribute("aria-orientation", v ? "vertical" : "horizontal");
+    this.tabs.forEach((t, j) => {
+      t.selected = j === i;
+      t.toggleAttribute("data-vertical", v);
+    });
     this.scene?.wake();
   }
 };
@@ -1393,8 +1398,13 @@ var AidTab = class extends AidGas {
         return;
       }
       const rtl = getComputedStyle(this).direction === "rtl";
-      if (e.key === "ArrowLeft") next = i + (rtl ? 1 : -1);
-      if (e.key === "ArrowRight") next = i + (rtl ? -1 : 1);
+      if (bar.hasAttribute("vertical")) {
+        if (e.key === "ArrowUp") next = i - 1;
+        if (e.key === "ArrowDown") next = i + 1;
+      } else {
+        if (e.key === "ArrowLeft") next = i + (rtl ? 1 : -1);
+        if (e.key === "ArrowRight") next = i + (rtl ? -1 : 1);
+      }
       if (next < 0 || next >= tabs.length) return;
       e.preventDefault();
       tabs[next].focus();
@@ -1405,7 +1415,7 @@ var AidTab = class extends AidGas {
     return ["disabled", "selected"];
   }
   extraCss() {
-    return ":host{cursor:pointer;flex-direction:column;gap:1px;border-radius:25px;margin:0;user-select:none;-webkit-user-select:none}:host(:focus-visible){outline:2px solid currentColor;outline-offset:2px}";
+    return ":host{cursor:pointer;flex-direction:column;gap:1px;border-radius:25px;margin:0;user-select:none;-webkit-user-select:none}:host([data-vertical]){flex-direction:row;justify-content:flex-start;gap:10px;min-height:44px;padding:0 14px;border-radius:14px}:host(:focus-visible){outline:2px solid currentColor;outline-offset:2px}";
   }
   connectedCallback() {
     super.connectedCallback();
@@ -1960,6 +1970,341 @@ var AidIcon = class extends HTMLElement {
   }
 };
 
+// src/components/extra.ts
+var KIND_CSS = ":host([kind=info]){--aid-excitation-color:var(--aid-info,56,128,232)}:host([kind=success]){--aid-excitation-color:var(--aid-success,38,160,105)}:host([kind=warning]){--aid-excitation-color:var(--aid-warning,224,150,24)}:host([kind=danger]){--aid-excitation-color:var(--aid-danger,214,69,61)}";
+var urgent = (el) => {
+  const k = el.getAttribute("kind");
+  return k === "danger" || k === "warning";
+};
+var AidAlert = class extends AidGas {
+  static get observedAttributes() {
+    return ["kind"];
+  }
+  extraCss() {
+    return ":host{display:flex;justify-content:flex-start;gap:10px;width:100%;padding:12px 14px;border-radius:var(--aid-radius-md,14px);color:inherit;font:inherit;--aid-pressure:.8;--aid-weight:.3;--aid-excitation:.45}" + KIND_CSS;
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.sync();
+  }
+  attributeChangedCallback() {
+    this.sync();
+    super.attributeChangedCallback();
+  }
+  sync() {
+    this.setAttribute("role", urgent(this) ? "alert" : "status");
+  }
+};
+var AidToast = class extends AidGas {
+  constructor() {
+    super(...arguments);
+    this.timer = 0;
+    /** milliseconds before it closes; 0 keeps it until closed */
+    this.duration = 5e3;
+    this.hold = () => {
+      clearTimeout(this.timer);
+    };
+    this.arm = () => {
+      clearTimeout(this.timer);
+      if (this.duration > 0) this.timer = window.setTimeout(() => this.close(), this.duration);
+    };
+  }
+  extraCss() {
+    return ":host{display:flex;justify-content:flex-start;gap:10px;max-width:min(92vw,420px);padding:12px 16px;border-radius:var(--aid-radius-lg,20px);color:inherit;font:inherit;font-size:.9375em;pointer-events:auto;--aid-pressure:1.2;--aid-weight:.2;--aid-excitation:.4;--_aid-bf:blur(12px) saturate(.9);animation:aid-toast-in .18s ease-out}@keyframes aid-toast-in{from{opacity:0;transform:translateY(8px)}}@media (prefers-reduced-motion:reduce){:host{animation:none}}" + KIND_CSS;
+  }
+  interactive() {
+    return true;
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.setAttribute("role", urgent(this) ? "alert" : "status");
+    this.addEventListener("pointerenter", this.hold);
+    this.addEventListener("focusin", this.hold);
+    this.addEventListener("pointerleave", this.arm);
+    this.addEventListener("focusout", this.arm);
+    this.arm();
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    clearTimeout(this.timer);
+  }
+  close() {
+    if (!this.isConnected) return;
+    this.dispatchEvent(new Event("close"));
+    this.remove();
+  }
+};
+function toast(message, opts = {}) {
+  const scene = opts.scene || document.querySelector("aid-scene");
+  if (!scene) return null;
+  let region = scene.querySelector(":scope > .aid-toasts");
+  if (!region) {
+    region = document.createElement("div");
+    region.className = "aid-toasts";
+    region.setAttribute("role", "region");
+    region.setAttribute("aria-label", "Notifications");
+    scene.append(region);
+  }
+  region.style.position = scene.hasAttribute("fixed") ? "fixed" : "absolute";
+  const t = document.createElement("aid-toast");
+  if (opts.kind) t.setAttribute("kind", opts.kind);
+  t.duration = opts.duration ?? (opts.kind === "danger" || opts.kind === "warning" ? 8e3 : 5e3);
+  t.append(message);
+  region.append(t);
+  return t;
+}
+var AidMenuItem = class extends HTMLElement {
+  constructor() {
+    super();
+    const root = this.attachShadow({ mode: "open" });
+    root.innerHTML = "<style>:host{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:10px;cursor:pointer;user-select:none;-webkit-user-select:none;font:inherit;color:inherit;white-space:nowrap;outline:0}:host(:hover),:host(:focus){background:color-mix(in srgb,currentColor 10%,transparent)}:host(:focus-visible){outline:2px solid currentColor;outline-offset:-2px}:host([danger]){color:rgb(var(--aid-danger,214,69,61))}:host([disabled]){opacity:.5;cursor:not-allowed;background:none}</style><slot></slot>";
+  }
+  connectedCallback() {
+    this.setAttribute("role", "menuitem");
+    this.tabIndex = -1;
+    if (this.hasAttribute("disabled")) this.setAttribute("aria-disabled", "true");
+  }
+};
+var AidMenu = class extends AidGas {
+  constructor() {
+    super(...arguments);
+    this.anchor = null;
+    this.trigger = null;
+    this.onTrigger = () => {
+      if (this.open) this.close();
+      else this.show();
+    };
+    this.onResize = (e) => {
+      if (e.type === "scroll" && e.target instanceof Node && this.contains(e.target)) return;
+      this.close(false);
+    };
+    this.onOutside = (e) => {
+      const path = e.composedPath();
+      if (path.includes(this) || this.anchor && path.includes(this.anchor)) return;
+      this.close(false);
+    };
+    this.onClick = (e) => {
+      const item = e.target.closest("aid-menu-item");
+      if (!item || item.hasAttribute("disabled")) return;
+      this.dispatchEvent(new CustomEvent("select", { detail: { value: item.getAttribute("value") ?? item.textContent?.trim() ?? "", item } }));
+      this.close();
+    };
+    this.onKey = (e) => {
+      const items = this.items, i = items.indexOf(document.activeElement);
+      if (e.key === "Escape") {
+        e.preventDefault();
+        this.close();
+        return;
+      }
+      if (e.key === "Tab") {
+        this.close();
+        return;
+      }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        document.activeElement?.click();
+        return;
+      }
+      const n = e.key === "ArrowDown" ? (i + 1) % items.length : e.key === "ArrowUp" ? (i - 1 + items.length) % items.length : e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : -1;
+      if (n < 0 || !items.length) return;
+      e.preventDefault();
+      items[n].focus();
+    };
+  }
+  static get observedAttributes() {
+    return ["open"];
+  }
+  extraCss() {
+    return ":host{display:none;position:absolute;z-index:950;flex-direction:column;align-items:stretch;justify-content:flex-start;min-width:180px;max-width:min(92vw,320px);max-height:min(70vh,420px);overflow:auto;padding:6px;border-radius:var(--aid-radius-md,14px);color:inherit;font:inherit;--aid-pressure:1.2;--aid-weight:.15;--_aid-bf:blur(12px) saturate(.9)}:host([open]){display:flex}";
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.setAttribute("role", "menu");
+    if (findScene(this)?.hasAttribute("fixed")) this.style.position = "fixed";
+    this.addEventListener("click", this.onClick);
+    this.addEventListener("keydown", this.onKey);
+    const id = this.getAttribute("for");
+    this.trigger = id ? this.getRootNode().getElementById(id) : null;
+    if (this.trigger) {
+      this.trigger.setAttribute("aria-haspopup", "menu");
+      this.trigger.setAttribute("aria-expanded", "false");
+      this.trigger.addEventListener("click", this.onTrigger);
+    }
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.removeEventListener("click", this.onClick);
+    this.removeEventListener("keydown", this.onKey);
+    this.trigger?.removeEventListener("click", this.onTrigger);
+    this.unlisten();
+  }
+  attributeChangedCallback(name) {
+    if (name === "open" && this.isConnected && !this.open) this.unlisten();
+    super.attributeChangedCallback();
+  }
+  get open() {
+    return this.hasAttribute("open");
+  }
+  get items() {
+    return Array.from(this.querySelectorAll("aid-menu-item")).filter((i) => !i.hasAttribute("disabled"));
+  }
+  show(anchor) {
+    this.anchor = anchor || this.trigger;
+    this.setAttribute("open", "");
+    this.place();
+    this.anchor?.setAttribute("aria-expanded", "true");
+    this.items[0]?.focus();
+    setTimeout(() => {
+      if (this.open) {
+        document.addEventListener("pointerdown", this.onOutside, true);
+        window.addEventListener("resize", this.onResize);
+        window.addEventListener("scroll", this.onResize, true);
+      }
+    });
+  }
+  close(refocus = true) {
+    if (!this.open) return;
+    this.removeAttribute("open");
+    this.anchor?.setAttribute("aria-expanded", "false");
+    if (refocus) this.anchor?.focus();
+  }
+  unlisten() {
+    document.removeEventListener("pointerdown", this.onOutside, true);
+    window.removeEventListener("resize", this.onResize);
+    window.removeEventListener("scroll", this.onResize, true);
+  }
+  /** below the anchor, aligned to its inline start; flipped above or shifted when there is no room */
+  place() {
+    const a = this.anchor?.getBoundingClientRect();
+    if (!a) return;
+    const fixed = this.style.position === "fixed";
+    const box = fixed ? { left: 0, top: 0, width: document.documentElement.clientWidth, height: window.innerHeight } : (this.offsetParent || document.body).getBoundingClientRect();
+    const w = this.offsetWidth, h = this.offsetHeight, gap = 6, rtl = getComputedStyle(this).direction === "rtl";
+    let x = (rtl ? a.right - w : a.left) - box.left, y = a.bottom + gap - box.top;
+    x = Math.max(8, Math.min(x, box.width - w - 8));
+    if (y + h > box.height - 8 && a.top - box.top - gap - h >= 8) y = a.top - box.top - gap - h;
+    this.style.left = Math.round(x) + "px";
+    this.style.top = Math.round(y) + "px";
+  }
+};
+var AidSlider = class extends HTMLElement {
+  constructor() {
+    super();
+    this.parts = [];
+    this.dragging = false;
+    this.last = 0;
+    this.onDown = (e) => {
+      if (this.disabled || e.button > 0) return;
+      this.dragging = true;
+      this.last = this.value;
+      this.setPointerCapture(e.pointerId);
+      this.set(this.at(e), false);
+    };
+    this.onMove = (e) => {
+      if (this.dragging) this.set(this.at(e), false);
+    };
+    this.onUp = (e) => {
+      if (!this.dragging) return;
+      this.dragging = false;
+      const v = this.value;
+      if (v !== this.last) {
+        this.last = v;
+        this.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      if (this.hasPointerCapture(e.pointerId)) this.releasePointerCapture(e.pointerId);
+    };
+    this.onKey = (e) => {
+      if (this.disabled) return;
+      const rtl = getComputedStyle(this).direction === "rtl", s = this.step, v = this.value;
+      const d = e.key === "ArrowUp" ? s : e.key === "ArrowDown" ? -s : e.key === "ArrowRight" ? rtl ? -s : s : e.key === "ArrowLeft" ? rtl ? s : -s : e.key === "PageUp" ? 10 * s : e.key === "PageDown" ? -10 * s : e.key === "Home" ? this.min - v : e.key === "End" ? this.max - v : 0;
+      if (!d) return;
+      e.preventDefault();
+      this.last = v;
+      this.set(v + d, true);
+    };
+    const root = this.attachShadow({ mode: "open" });
+    root.innerHTML = '<style>:host{display:block;position:relative;height:32px;min-width:120px;width:100%;touch-action:pan-y;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent}:host([disabled]){cursor:not-allowed;opacity:.55}.track{position:absolute;inset-inline:0;top:11px;height:10px;border-radius:5px;display:flex;justify-content:flex-start;--aid-pressure:.12;--aid-weight:0}.bar{height:100%;width:calc(12px + var(--_k,0) * (100% - 24px));min-width:0;border-radius:5px;--aid-pressure:2;--aid-weight:0;--aid-excitation:.5;--aid-membrane:0}.thumb{position:absolute;top:4px;inset-inline-start:calc(var(--_k,0) * (100% - 24px));width:24px;height:24px;border-radius:50%;--aid-pressure:1.4;--aid-weight:.1;background:color-mix(in srgb,var(--aid-color-surface,#fff) 78%,transparent);box-shadow:0 1px 2px rgba(0,0,0,.2)}:host(:focus-visible) .thumb{outline:2px solid currentColor;outline-offset:3px;--aid-excitation:.8}</style><aid-gas class="track"><aid-gas class="bar"></aid-gas></aid-gas><aid-gas class="thumb"></aid-gas>';
+    this.parts = Array.from(root.querySelectorAll("aid-gas"));
+    this.parts[0].shell = () => true;
+  }
+  static get observedAttributes() {
+    return ["value", "min", "max", "step", "disabled"];
+  }
+  connectedCallback() {
+    this.setAttribute("role", "slider");
+    this.addEventListener("pointerdown", this.onDown);
+    this.addEventListener("pointermove", this.onMove);
+    this.addEventListener("pointerup", this.onUp);
+    this.addEventListener("pointercancel", this.onUp);
+    this.addEventListener("keydown", this.onKey);
+    this.sync();
+  }
+  disconnectedCallback() {
+    this.removeEventListener("pointerdown", this.onDown);
+    this.removeEventListener("pointermove", this.onMove);
+    this.removeEventListener("pointerup", this.onUp);
+    this.removeEventListener("pointercancel", this.onUp);
+    this.removeEventListener("keydown", this.onKey);
+  }
+  attributeChangedCallback() {
+    if (this.isConnected) this.sync();
+  }
+  num(name, d) {
+    const v = parseFloat(this.getAttribute(name) ?? "");
+    return isFinite(v) ? v : d;
+  }
+  get min() {
+    return this.num("min", 0);
+  }
+  get max() {
+    return Math.max(this.min, this.num("max", 100));
+  }
+  get step() {
+    return Math.max(1e-9, this.num("step", 1));
+  }
+  get disabled() {
+    return this.hasAttribute("disabled");
+  }
+  get value() {
+    return this.snap(this.num("value", this.min));
+  }
+  set value(v) {
+    this.setAttribute("value", String(this.snap(v)));
+  }
+  snap(v) {
+    const s = this.step, n = Math.round((Math.min(this.max, Math.max(this.min, v)) - this.min) / s) * s + this.min;
+    return Math.min(this.max, +n.toFixed(6));
+  }
+  sync() {
+    const v = this.value, span = this.max - this.min;
+    this.style.setProperty("--_k", String(span > 0 ? (v - this.min) / span : 0));
+    this.setAttribute("aria-valuemin", String(this.min));
+    this.setAttribute("aria-valuemax", String(this.max));
+    this.setAttribute("aria-valuenow", String(v));
+    this.tabIndex = this.disabled ? -1 : 0;
+    if (this.disabled) this.setAttribute("aria-disabled", "true");
+    else this.removeAttribute("aria-disabled");
+    for (const p of this.parts) p.toggleAttribute("disabled", this.disabled);
+  }
+  set(v, done) {
+    const n = this.snap(v);
+    if (n !== this.value) {
+      this.value = n;
+      this.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    if (done && n !== this.last) {
+      this.last = n;
+      this.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+  at(e) {
+    const r = this.getBoundingClientRect(), pad = 12;
+    let k = (e.clientX - r.left - pad) / Math.max(1, r.width - 2 * pad);
+    if (getComputedStyle(this).direction === "rtl") k = 1 - k;
+    return this.min + Math.min(1, Math.max(0, k)) * (this.max - this.min);
+  }
+};
+
 // src/core/tokens.ts
 var LIGHT = `--aid-color-bg:#EEF0F3;--aid-color-surface:#FAFBFC;--aid-color-ink:#13171B;--aid-color-ink-muted:#56606B;--aid-color-line:#D5DAE0;
 --aid-danger:214,69,61;--aid-success:38,160,105;--aid-warning:224,150,24;--aid-info:56,128,232;
@@ -1985,6 +2330,16 @@ var GLOBAL_CSS = `
 aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-dialog,aid-switch,aid-checkbox,aid-radio){--_aid-bf:blur(calc(var(--aid-pressure,1) * 7px)) saturate(.92)}
 aid-scene:not([backdrop="canvas"]) :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio)[disabled]{--_aid-bf:none}
 aid-scene:not([backdrop="canvas"]) aid-tab{--_aid-bf:none}
+aid-scene:not([backdrop="canvas"]) aid-alert{--_aid-bf:blur(6px) saturate(.92)}
+.aid-toasts{inset-inline:0;bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:980;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 12px;pointer-events:none}
+/* data tables are plain content: no gas, only tokens */
+:where(.aid-table-wrap){overflow-x:auto}
+:where(.aid-table){width:100%;border-collapse:collapse;font-size:var(--aid-text-sm,14px);color:var(--aid-color-ink)}
+:where(.aid-table) :where(th,td){text-align:start;padding:10px 12px;border-bottom:1px solid var(--aid-color-line);vertical-align:middle;white-space:nowrap}
+:where(.aid-table) :where(th){font-weight:600;color:var(--aid-color-ink-muted);font-size:var(--aid-text-xs,12px)}
+:where(.aid-table) :where(tbody tr:hover){background:color-mix(in srgb,var(--aid-color-ink) 4%,transparent)}
+:where(.aid-table) :where(tr[aria-selected="true"]){background:color-mix(in srgb,var(--aid-color-ink) 8%,transparent)}
+:where(.aid-table) :where(.num){text-align:end;font-variant-numeric:tabular-nums}
 /* the static tier is for the weakest devices: one blur per container is the most expensive thing on the page there */
 aid-scene[data-aid-tier="static"] :is(aid-gas,aid-button,aid-tabs,aid-chip,aid-field,aid-card,aid-switch,aid-checkbox,aid-radio){--_aid-bf:none}
 `;
@@ -2010,7 +2365,12 @@ function define() {
     ["aid-card", AidCard],
     ["aid-progress", AidProgress],
     ["aid-dialog", AidDialog],
-    ["aid-icon", AidIcon]
+    ["aid-icon", AidIcon],
+    ["aid-alert", AidAlert],
+    ["aid-toast", AidToast],
+    ["aid-menu", AidMenu],
+    ["aid-menu-item", AidMenuItem],
+    ["aid-slider", AidSlider]
   ];
   for (const [name, ctor] of reg) if (!customElements.get(name)) customElements.define(name, ctor);
 }
@@ -2018,6 +2378,7 @@ define();
 export {
   AIR_MOLAR_MASS,
   AIR_REFRACTIVITY,
+  AidAlert,
   AidButton,
   AidCard,
   AidCheckbox,
@@ -2026,12 +2387,16 @@ export {
   AidField,
   AidGas,
   AidIcon,
+  AidMenu,
+  AidMenuItem,
   AidProgress,
   AidRadio,
   AidScene,
+  AidSlider,
   AidSwitch,
   AidTab,
   AidTabs,
+  AidToast,
   CONTAINER_DEFAULTS,
   GASES,
   GasEngine,
@@ -2050,6 +2415,7 @@ export {
   readSceneParams,
   responseSpeed,
   scatterRelative,
-  thermalSpeed
+  thermalSpeed,
+  toast
 };
 //# sourceMappingURL=aid.js.map

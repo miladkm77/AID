@@ -1,6 +1,6 @@
 {
   "name": "aid-gas",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "AID \u2014 Atmospheric Interface Design. A noble-gas material for user interfaces (WebGL2 + Web Components).",
   "main": "dist/aid.js",
   "scripts": {
